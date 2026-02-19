@@ -1,3 +1,8 @@
+
+
+import type { SRSData } from "@/lib/srs";
+
+
 export interface FlashcardData {
     russian: string;
     russianWithStress?: string; // e.g. семья́
@@ -17,12 +22,7 @@ export interface FlashcardData {
     audio_scope?: 'click_only' | 'auto_narrate_optional';
     audio_note?: string; // e.g. "stress on YA"
 
-    // Phase 2: SRS Metadata
-    srs?: {
-        nextReview: number; // Timestamp (ms)
-        interval: number;   // Days
-        easeFactor: number; // Multiplier (default 2.5)
-        reviewCount: number;
-        status: 'new' | 'learning' | 'review' | 'relearning' | 'graduated';
-    };
+    // Phase 3: SRS Metadata
+    srs?: SRSData;
 }
+

@@ -191,3 +191,29 @@ export const validateAnswer = async (apiKey: string, prompt: string, userAnswer:
         };
     }
 };
+
+export const explainError = async (apiKey: string, question: string, userAnswer: string, correctAnswer: string) => {
+    if (!apiKey) throw new Error("API Key is required");
+    const client = getOpenAIClient(apiKey);
+
+    try {
+        const response = await client.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a helpful Russian tutor. Explain briefly (max 2 sentences) why the student's answer is incorrect. Focus on grammar (case, gender, number) or vocabulary difference."
+                },
+                {
+                    role: "user",
+                    content: `Question: "${question}"\nCorrect Answer: "${correctAnswer}"\nStudent Answer: "${userAnswer}"`
+                }
+            ],
+            max_tokens: 60,
+        });
+        return response.choices[0].message.content;
+    } catch (error) {
+        console.error("Explanation Error:", error);
+        return "Could not generate explanation.";
+    }
+};

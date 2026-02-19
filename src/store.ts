@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { FlashcardData } from '@/types/flashcard';
 import type { SavedLesson, LessonContent } from '@/types/lesson';
-import { calculateReview, type ReviewRating } from '@/lib/srs';
+import { calculateReview, isDue, type ReviewRating } from '@/lib/srs';
 import { EMBEDDED_API_KEY } from './config';
 
 export interface FlashcardDeck {
@@ -22,6 +22,7 @@ interface AppState {
     deleteDeck: (id: string) => void;
     saveCardToDeck: (deckId: string, card: FlashcardData) => void;
     reviewCard: (deckId: string, cardIndex: number, rating: ReviewRating) => void;
+    getDueCards: (deckId: string) => FlashcardData[];
 
     // Lesson State
     savedLessons: SavedLesson[];
@@ -41,8 +42,8 @@ interface AppState {
     setAudioSettings: (settings: Partial<AppState['audioSettings']>) => void;
 
     // Chat Persistence
-    chatSessions: Record<string, any[]>;
-    saveChatSession: (scenarioId: string, messages: any[]) => void;
+    chatSessions: Record<string, { role: string, content: string }[]>;
+    saveChatSession: (scenarioId: string, messages: { role: string, content: string }[]) => void;
     clearChatSession: (scenarioId: string) => void;
 
     // Phase 2: Error Profiling
@@ -51,11 +52,25 @@ interface AppState {
         lastMistakes: { prompt: string, error: string, correct: string, timestamp: number }[];
     };
     logError: (tag: string, mistake: { prompt: string, error: string, correct: string }) => void;
+
+    // Phase 2: Curriculum Progress
+    userProgress: {
+        completedNodes: string[]; // List of Node IDs
+        currentUnitId: string;
+        isOnboarded: boolean; // NEW: Track if user has completed onboarding
+        userGoal?: string;    // NEW: User's learning goal
+        hearts: number;
+        streak: number;
+        xp: number;
+    };
+    completeNode: (nodeId: string) => void;
+    unlockUnit: (unitId: string) => void;
+    completeOnboarding: (level: string, goal?: string) => void; // NEW Action
 }
 
 export const useAppStore = create<AppState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             apiKey: EMBEDDED_API_KEY || '',
             setApiKey: (key) => set({ apiKey: key }),
 
@@ -89,10 +104,10 @@ export const useAppStore = create<AppState>()(
                 })
             })),
 
-            getDueCards: (_deckId: string) => {
-                // This is a selector, but we can't 'get' state inside 'set' easily without get().
-                // Zustand persist makes this tricky if we want it as a pure function.
-                return [];
+            getDueCards: (deckId: string) => {
+                const deck = get().decks.find(d => d.id === deckId);
+                if (!deck) return [];
+                return deck.cards.filter(card => isDue(card));
             },
 
             savedLessons: [],
@@ -148,6 +163,36 @@ export const useAppStore = create<AppState>()(
                     }
                 };
             }),
+
+            userProgress: {
+                completedNodes: [],
+                currentUnitId: 'unit-1',
+                isOnboarded: false,
+                hearts: 5,
+                streak: 1, // Mock start
+                xp: 0
+            },
+            completeNode: (nodeId) => set((state) => ({
+                userProgress: {
+                    ...state.userProgress,
+                    completedNodes: [...new Set([...state.userProgress.completedNodes, nodeId])],
+                    xp: state.userProgress.xp + 10 // Mock XP
+                }
+            })),
+            unlockUnit: (unitId) => set((state) => ({
+                userProgress: {
+                    ...state.userProgress,
+                    currentUnitId: unitId
+                }
+            })),
+            completeOnboarding: (level, goal) => set((state) => ({
+                userProgress: {
+                    ...state.userProgress,
+                    isOnboarded: true,
+                    userGoal: goal,
+                    currentUnitId: level === 'Unit 1' ? 'unit-1' : 'unit-5' // Basic skip logic
+                }
+            })),
         }),
         {
             name: 'privet-ai-storage',

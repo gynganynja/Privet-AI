@@ -1,121 +1,87 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
-import { MessageCircle, BookOpen, Layers, Users, Settings, Menu, LayoutDashboard } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Home, Dumbbell, User, Flame, Heart, Zap } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useAppStore } from '@/store';
 
+// IA: 3 Core Tabs
+const TABS = [
+    { label: "Home", path: "/", icon: Home },
+    { label: "Practice", path: "/practice", icon: Dumbbell },
+    { label: "Profile", path: "/profile", icon: User }
+];
 
-
-export default function Layout() {
+function Layout() {
     const location = useLocation();
-    const [open, setOpen] = useState(false);
-
-    const navItems = [
-        { to: "/", icon: LayoutDashboard, label: "Home" },
-        { to: "/chat", icon: MessageCircle, label: "Chat" },
-        { to: "/lessons", icon: BookOpen, label: "Lessons" },
-        { to: "/flashcards", icon: Layers, label: "Flashcards" },
-        { to: "/roleplay", icon: Users, label: "Roleplay" },
-        { to: "/settings", icon: Settings, label: "Settings" },
-    ];
+    const { userProgress } = useAppStore();
 
     return (
-        <div className="grid h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] overflow-hidden">
-            {/* Desktop Sidebar */}
-            <div className="hidden border-r bg-slate-900 text-slate-50 md:block overflow-y-auto">
-                <div className="flex h-full max-h-screen flex-col gap-2">
-                    <div className="flex h-14 items-center border-b border-slate-800 px-4 lg:h-[60px] lg:px-6 shrink-0 sticky top-0 bg-slate-900 z-10">
-                        <Link to="/" className="flex items-center gap-2 font-bold text-lg tracking-wide">
-                            <img src="/logo.jpg" alt="Privet AI Logo" className="h-8 w-8 rounded-lg object-cover" />
-                            <span><span className="text-primary">Privet</span> <span className="text-white">AI</span></span>
-                        </Link>
+        <div className="flex flex-col h-screen bg-background">
+            {/* Top Gamification Header */}
+            <header className="px-4 h-14 border-b flex items-center justify-between bg-card z-40 shrink-0">
+                {/* Flag / Course (Static for now) */}
+                <div className="w-8 h-6 bg-blue-600 rounded-sm relative overflow-hidden border">
+                    <div className="absolute top-0 w-full h-1/3 bg-white" />
+                    <div className="absolute bottom-0 w-full h-1/3 bg-red-600" />
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* Streak */}
+                    <div className="flex items-center gap-1 text-orange-500">
+                        <Flame className={cn("w-5 h-5", userProgress.streak > 0 && "fill-orange-500")} />
+                        <span className="font-bold text-sm">{userProgress.streak}</span>
                     </div>
-                    <div className="flex-1 py-4">
-                        <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-1">
-                            {navItems.map((item) => (
-                                <Link
-                                    key={item.to}
-                                    to={item.to}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-white",
-                                        location.pathname === item.to
-                                            ? "bg-primary text-primary-foreground shadow-sm"
-                                            : "text-slate-400 hover:bg-slate-800"
-                                    )}
-                                >
-                                    <item.icon className="h-4 w-4" />
-                                    {item.label}
-                                </Link>
-                            ))}
-                        </nav>
+
+                    {/* Hearts */}
+                    <div className="flex items-center gap-1 text-red-500">
+                        <Heart className={cn("w-5 h-5", userProgress.hearts > 0 && "fill-red-500")} />
+                        <span className="font-bold text-sm">{userProgress.hearts}</span>
+                    </div>
+
+                    {/* XP */}
+                    <div className="flex items-center gap-1 text-yellow-500">
+                        <Zap className="w-5 h-5 fill-yellow-500" />
+                        <span className="font-bold text-sm">{userProgress.xp}</span>
                     </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Mobile Header & Content */}
-            <div className="flex flex-col h-full overflow-hidden bg-background">
-                <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 md:hidden shrink-0">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0 md:hidden"
-                        onClick={() => setOpen(true)}
-                    >
-                        <Menu className="h-5 w-5" />
-                        <span className="sr-only">Toggle navigation menu</span>
-                    </Button>
-                    <div className="w-full flex-1 flex items-center gap-2">
-                        <img src="/logo.jpg" alt="Privet AI Logo" className="h-6 w-6 rounded-md object-cover" />
-                        <span className="font-semibold text-foreground">Privet AI</span>
-                    </div>
-                </header>
+            {/* Main Content Area - Scrollable */}
+            <main className="flex-1 overflow-y-auto pb-24">
+                <Outlet />
+            </main>
 
-                {/* Mobile Menu Overlay */}
-                {open && (
-                    <div className="fixed inset-0 z-50 md:hidden">
-                        {/* Backdrop */}
-                        <div
-                            className="absolute inset-0 bg-black/50"
-                            onClick={() => setOpen(false)}
-                        />
-                        {/* Sidebar */}
-                        <div className="absolute top-0 bottom-0 left-0 w-3/4 max-w-xs bg-slate-900 text-slate-50 border-r border-slate-800 p-6 shadow-lg z-50 flex flex-col gap-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <img src="/logo.jpg" alt="Privet AI Logo" className="h-8 w-8 rounded-lg object-cover" />
-                                    <span className="text-lg font-bold"><span className="text-primary">Privet</span> AI</span>
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-slate-400 hover:text-white hover:bg-slate-800">
-                                    <Menu className="h-5 w-5" />
-                                </Button>
-                            </div>
-                            <nav className="grid gap-2 text-lg font-medium">
-                                {navItems.map((item) => (
-                                    <Link
-                                        key={item.to}
-                                        to={item.to}
-                                        onClick={() => setOpen(false)}
-                                        className={cn(
-                                            "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-white",
-                                            location.pathname === item.to
-                                                ? "bg-primary text-primary-foreground shadow-sm"
-                                                : "text-slate-400 hover:bg-slate-800"
-                                        )}
-                                    >
-                                        <item.icon className="h-5 w-5" />
-                                        {item.label}
-                                    </Link>
-                                ))}
-                            </nav>
-                        </div>
-                    </div>
-                )}
+            {/* Bottom Tab Navigation */}
+            <nav className="fixed bottom-0 left-0 right-0 border-t bg-card z-40 pb-safe">
+                <div className="flex justify-around items-center h-16 max-w-md mx-auto">
+                    {TABS.map((tab) => {
+                        const isActive = location.pathname === tab.path;
+                        const Icon = tab.icon;
 
-                {/* Main Content Area */}
-                <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 overflow-y-auto w-full max-w-7xl mx-auto">
-                    <Outlet />
-                </main>
-            </div>
+                        return (
+                            <Link
+                                key={tab.path}
+                                to={tab.path}
+                                className={cn(
+                                    "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
+                                    isActive
+                                        ? "text-primary " // Blue
+                                        : "text-muted-foreground hover:text-foreground" // Grey -> Dark
+                                )}
+                            >
+                                {/* Icon State: Filled if active? Lucide doesn't support fill easily, use weight/color */}
+                                <Icon
+                                    size={24}
+                                    strokeWidth={isActive ? 3 : 2}
+                                    className={cn(isActive && "animate-pulse-once")}
+                                />
+                                <span className="text-xs font-medium">{tab.label}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
         </div>
     );
 }
+
+export default Layout;

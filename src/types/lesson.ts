@@ -83,6 +83,7 @@ export type DrillExercise =
         prompt: string;
         textToDisplay?: string; // Challenge text
         correctAnswer: string;
+        answer_key?: AnswerKey; // V2 Robust Validation
         translation?: string; // Literal meaning or hint
         explanation?: string; // Detailed teacher feedback
         audio_text_ru?: string;
@@ -131,6 +132,70 @@ export interface DialogueModule {
     }[];
 }
 
+export interface LessonV2 {
+    lesson_meta: {
+        unit_id: string;
+        node_id: string;
+        lesson_id: string;
+        objective: string;
+        lesson_flavor: 'standard' | 'scenario';
+        week_number: number;
+        new_vocab_count: number;
+        grammar_tags_used: string[];
+    };
+    teach: TeachCard[];
+    drill: DrillExercise[];
+    recall: RecallCard[];
+    use: (DialogueModule | DrillExercise)[]; // Use section can contain dialogue or complex drills
+    review: any;
+}
+
+export interface AnswerKey {
+    accepted_answers_base: string[];
+    accepted_answers_display?: string[];
+    normalization?: {
+        case_insensitive?: boolean;
+        trim_whitespace?: boolean;
+        collapse_multiple_spaces?: boolean;
+        ignore_punctuation?: boolean;
+        ignore_stress_marks?: boolean;
+        accept_ё_as_е?: boolean;
+    };
+    reject_if_contains?: string[];
+    common_wrong_answers?: { value: string; error_tag: string; feedback_en: string }[];
+}
+
+export interface TeachCard {
+    type: 'teach_card';
+    ru_base: string;
+    ru_display: string;
+    en: string;
+    translit_spelling?: string;
+    translit_visible_default?: boolean;
+    pronunciation_hint?: string;
+    audio_text_ru: string;
+    notes?: string;
+}
+
+export interface RecallCard {
+    type: 'recall_translate';
+    skill_tag?: string;
+    title?: string;
+    prompt_en: string;
+    context_en?: string;
+    expected_input?: 'cyrillic' | 'speech';
+    input_placeholder_ru?: string;
+    answer_key: AnswerKey;
+    feedback?: {
+        correct_en: string;
+        incorrect_en: string;
+    };
+    // Compatibility fields for DrillExercise
+    prompt?: string; // mapped from prompt_en
+    correctAnswer?: string; // mapped from first base answer
+    audio_text_ru?: string;
+}
+
 export interface StoryModule {
     type: 'story';
     title: string;
@@ -140,3 +205,4 @@ export interface StoryModule {
     comprehensionQuestions: DrillExercise[]; // Quick checks
     audio_text_ru?: string; // Full story audio
 }
+

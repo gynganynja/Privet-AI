@@ -45,7 +45,7 @@ export const playText = async (
     options: {
         voiceURI?: string | null;
         speed?: number;
-        lang?: string; // New: explicit language request
+        lang?: string; // explicit language request
         onEnd?: () => void;
         onError?: () => void;
     } = {}
@@ -61,6 +61,7 @@ export const playText = async (
     const cleanText = cleanTextForTTS(text);
 
     const { audioSettings, apiKey } = useAppStore.getState();
+    const effectiveSpeed = options.speed ?? audioSettings.speed ?? 1.0; // Use specific option, then global setting, then default
 
     // 1. OpenAI TTS Provider
     if (audioSettings.provider === 'openai' && apiKey) {
@@ -69,7 +70,7 @@ export const playText = async (
                 apiKey,
                 cleanText, // Use cleaned text
                 audioSettings.openaiVoice || 'alloy',
-                options.speed || audioSettings.speed || 1.0
+                effectiveSpeed
             );
 
             const blob = new Blob([buffer], { type: 'audio/mpeg' });
@@ -78,14 +79,25 @@ export const playText = async (
             const audio = new Audio(url);
             currentAudio = audio;
 
-            audio.playbackRate = options.speed || audioSettings.speed || 1.0;
+            // OpenAI returns a file with the speed already baked in if possible? 
+            // Actually OpenAI's speed parameter does change the duration of the audio file generated.
+            // But HTMLAudioElement.playbackRate can ALSO change it. 
+            // We should rely on OpenAI generation speed, and set playbackRate to 1.0 roughly, 
+            // OR generate normal and use playbackRate. 
+            // OpenAI API `speed` param: 0.25 to 4.0. We should use that.
+
+            // Note: If we use the API speed param, we don't need to set audio.playbackRate unless we want EXTRA speed control.
+            // taking a safe bet: API speed is better quality.
+
             audio.onended = () => {
                 if (options.onEnd) options.onEnd();
                 URL.revokeObjectURL(url);
+                currentAudio = null;
             };
             audio.onerror = () => {
                 if (options.onError) options.onError();
                 URL.revokeObjectURL(url);
+                currentAudio = null;
             };
 
             await audio.play();
@@ -102,7 +114,7 @@ export const playText = async (
     const utterance = new SpeechSynthesisUtterance(cleanText); // Use cleaned text
 
     // Defaults
-    utterance.rate = options.speed || audioSettings.speed || 1.0;
+    utterance.rate = effectiveSpeed; // Browser range 0.1 to 10
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
@@ -115,7 +127,11 @@ export const playText = async (
         // Auto-select based on requested lang (default to RU)
         const targetLang = options.lang || 'ru';
         const voices = window.speechSynthesis.getVoices();
-        const voice = voices.find(v => v.lang.toLowerCase().includes(targetLang.toLowerCase()));
+        // Try to find a voice that matches the lang
+        // Prefer "Google" voices if available on Chrome as they are often better quality
+        const voice = voices.find(v => v.lang.toLowerCase().includes(targetLang.toLowerCase()) && v.name.includes('Google'))
+            || voices.find(v => v.lang.toLowerCase().includes(targetLang.toLowerCase()));
+
         if (voice) utterance.voice = voice;
     }
 

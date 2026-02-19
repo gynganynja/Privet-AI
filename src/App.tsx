@@ -1,14 +1,21 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Layout from './components/Layout'
-import SettingsPage from './pages/Settings'
+// Core IA Pages
+import HomePage from './pages/Home'
+import PracticePage from './pages/Practice'
+import ProfilePage from './pages/Profile'
 
-// Placeholder components for now
+// Detail Pages
 import LessonsPage from './pages/Lessons'
-import ChatPage from './pages/Chat'
-import FlashcardsPage from './pages/Flashcards'
-import DashboardPage from './pages/Dashboard'
-import RoleplayPage from './pages/Roleplay'
+import SettingsPage from './pages/Settings'
+import OnboardingPage from './pages/Onboarding'
+import { useAppStore } from "./store";
+
+// Legacy/Placeholder placeholder (can be removed later once files are deleted)
+// import ChatPage from './pages/Chat'
+// import FlashcardsPage from './pages/Flashcards'
+// import RoleplayPage from './pages/Roleplay'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -45,19 +52,38 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+// Protected Route Wrapper
+const RequireOnboarding = () => {
+  const { userProgress } = useAppStore();
+  return userProgress.isOnboarded ? <Outlet /> : <Navigate to="/onboarding" replace />;
+};
+
 function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/lessons" element={<LessonsPage />} />
-            <Route path="/flashcards" element={<FlashcardsPage />} />
-            <Route path="/roleplay" element={<RoleplayPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Public Route */}
+          <Route path="/onboarding" element={<OnboardingPage />} />
+
+          {/* Protected Routes */}
+          <Route element={<RequireOnboarding />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/practice" element={<PracticePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+
+              {/* Modal/Detail Routes - Typically these might overlay or be separate pages */}
+              <Route path="/lessons/:id" element={<LessonsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+
+              {/* Legacy redirect for safety */}
+              <Route path="/chat" element={<Navigate to="/practice" replace />} />
+              <Route path="/flashcards" element={<Navigate to="/practice" replace />} />
+              <Route path="/roleplay" element={<Navigate to="/practice" replace />} />
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
           </Route>
         </Routes>
       </HashRouter>

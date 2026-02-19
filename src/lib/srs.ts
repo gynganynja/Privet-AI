@@ -1,119 +1,85 @@
-import type { FlashcardData } from "@/types/flashcard";
-
 export type ReviewRating = 'again' | 'hard' | 'good' | 'easy';
 
-// Initial SRS state for a new card
-export const INITIAL_SRS_STATE: NonNullable<FlashcardData['srs']> = {
-    nextReview: 0, // Ready immediately
-    interval: 0,
-    easeFactor: 2.5,
-    reviewCount: 0,
-    status: 'new'
-};
+export interface SRSData {
+    interval: number; // Days until next review
+    repetition: number; // Number of successful reviews
+    efactor: number; // Easiness Factor (SM-2 standard: starts at 2.5)
+    dueDate: number; // Timestamp
+}
 
 /**
- * Calculates the next review schedule based on the modified SM-2 algorithm.
- * 
- * @param card The current flashcard data
- * @param rating User's rating: 'again' (fail), 'hard', 'good', 'easy'
- * @returns Updated SRS metadata object
+ * Enhanced SM-2 Algorithm
+ * Inputs: Current SRS state + Rating
+ * Output: New SRS state
  */
-export function calculateReview(
-    currentSrs: FlashcardData['srs'] = INITIAL_SRS_STATE,
+export const calculateReview = (
+    current: SRSData | undefined,
     rating: ReviewRating
-): NonNullable<FlashcardData['srs']> {
-    let { interval, easeFactor, reviewCount, status } = currentSrs;
-    const now = Date.now();
+): SRSData => {
+    // Default initial state
+    const prev = current || {
+        interval: 0,
+        repetition: 0,
+        efactor: 2.5,
+        dueDate: Date.now()
+    };
 
-    // 1. Update Status & Review Count
-    reviewCount++;
+    let newInterval = 0;
+    let newRepetition = 0;
+    let newEfactor = prev.efactor;
 
     if (rating === 'again') {
-        status = 'relearning';
-        interval = 0; // Reset interval
-        easeFactor = Math.max(1.3, easeFactor - 0.2); // Penalty
-
-        // Schedule for 1 minute later (essentially "now" for next refresh)
-        return {
-            nextReview: now + 60 * 1000,
-            interval: 0,
-            easeFactor,
-            reviewCount,
-            status
-        };
-    }
-
-    // Rating is Hard/Good/Easy
-    if (status === 'new' || status === 'relearning') {
-        status = 'learning';
-        interval = 1; // Start with 1 day
+        newRepetition = 0;
+        newInterval = 1; // 1 day (or could be 10 mins if we had intra-day logic)
+        // Penalize EF slightly less than comprehensive reset
+        newEfactor = Math.max(1.3, prev.efactor - 0.2);
     } else {
-        // Standard SM-2 calculation for 'review'/'learning' status
-        status = 'review';
+        // Successful review ('hard', 'good', 'easy')
 
-        if (reviewCount === 1) {
-            interval = 1;
-        } else if (reviewCount === 2) {
-            interval = 6;
+        // 1. Update E-Factor
+        // SM-2 Formula: EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+        // q: 3=Hard, 4=Good, 5=Easy
+        let q = 4;
+        if (rating === 'hard') q = 3;
+        if (rating === 'easy') q = 5;
+
+        newEfactor = prev.efactor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+        if (newEfactor < 1.3) newEfactor = 1.3; // Floor
+
+        // 2. Update Repetition
+        newRepetition = prev.repetition + 1;
+
+        // 3. Calculate Interval
+        if (newRepetition === 1) {
+            newInterval = 1;
+        } else if (newRepetition === 2) {
+            newInterval = 6;
         } else {
-            interval = Math.round(interval * easeFactor);
+            newInterval = Math.round(prev.interval * newEfactor);
+        }
+
+        // Hard penalty: if 'hard', reduce interval slightly compared to standard flow?
+        // Standard SM-2 doesn't do this explicitly other than via EF, but we can clamp.
+        if (rating === 'hard' && newInterval > prev.interval * 1.2) {
+            newInterval = Math.round(prev.interval * 1.2);
         }
     }
 
-    // Adjust ease factor based on rating
-    // SM-2 formula: EF' = EF + (0.1 - (5-q)*(0.08 + (5-q)*0.02))
-    // Mapped ratings: Again=0 (handled above), Hard=3, Good=4, Easy=5
-    let q = 4; // Default 'good'
-    if (rating === 'hard') q = 3;
-    if (rating === 'easy') q = 5;
-
-    // Apply modifiers
-    if (rating === 'hard') {
-        easeFactor = Math.max(1.3, easeFactor - 0.15);
-        interval = Math.max(1, Math.floor(interval * 0.8)); // Hard penalty on interval
-    } else if (rating === 'easy') {
-        easeFactor += 0.15;
-        interval = Math.floor(interval * 1.3); // Easy bonus
-    } else {
-        // Good: strict SM-2 slight adjustment? Or keep stable?
-        // SM-2 actually changes EF even for Good.
-        // EF' = EF + (0.1 - (1)*(0.08 + 0.02)) = EF
-        // Actually q=4 means (5-4)=1. Formula: 0.1 - 1*(0.1) = 0. No change for Good.
-    }
-
-    // Day in ms
-    const DAY_MS = 24 * 60 * 60 * 1000;
+    // Convert days to milliseconds for dueDate
+    const nextReviewDate = Date.now() + (newInterval * 24 * 60 * 60 * 1000);
 
     return {
-        nextReview: now + (interval * DAY_MS),
-        interval,
-        easeFactor,
-        reviewCount,
-        status: reviewCount > 4 ? 'graduated' : status
+        interval: newInterval,
+        repetition: newRepetition,
+        efactor: newEfactor,
+        dueDate: nextReviewDate
     };
-}
+};
 
 /**
  * Helper to check if a card is due
  */
-export function isCardDue(card: FlashcardData): boolean {
-    if (!card.srs) return true; // No SRS data = New = Due
-    return Date.now() >= card.srs.nextReview;
-}
-
-/**
- * Helper to get a human-readable due string
- */
-export function getDueString(nextReview: number): string {
-    const diff = nextReview - Date.now();
-    if (diff <= 0) return "Now";
-
-    const minutes = Math.floor(diff / (1000 * 60));
-    if (minutes < 60) return `${minutes}m`;
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 24) return `${hours}h`;
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    return `${days}d`;
-}
+export const isDue = (card: { srs?: SRSData }): boolean => {
+    if (!card.srs) return true; // New cards are due
+    return card.srs.dueDate <= Date.now();
+};

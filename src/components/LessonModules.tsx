@@ -4,12 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, CheckCircle2, XCircle, ArrowRight, AlertCircle } from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRight, AlertCircle, Volume2, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { useAppStore } from "@/store";
 import { playText } from "@/lib/audio";
+import { AudioPlayer } from "@/components/AudioPlayer";
 import { AudioRecorder } from "@/components/AudioRecorder";
+import { ClozeDrill } from "@/components/drills/ClozeDrill";
+import { TransformationDrill } from "@/components/drills/TransformationDrill";
+import { MinimalPairDrill } from "@/components/drills/MinimalPairDrill";
+import { explainError } from "@/lib/openai";
+import { validateInput } from "@/lib/answerValidation";
 
 // --- Helper Hook ---
 function useLessonAudio() {
@@ -31,43 +37,38 @@ function TeacherNarration({ text }: { text?: string }) {
     const [hasPlayed, setHasPlayed] = useState(false);
 
     useEffect(() => {
-        if (text && audioSettings.narration && !hasPlayed) {
-            // Small delay to allow transition
+        if (text && audioSettings.narration && !audioSettings.autoPlay && !hasPlayed) {
+            // Logic: If "Narration" is enabled globally (setting TBD), play it.
+            // For now, let's just stick to the specific "Auto-play" setting we added.
+            // If autoPlay is true, we play.
+        }
+        if (text && audioSettings.autoPlay && !hasPlayed) {
             const timer = setTimeout(() => {
                 playAudio(text, 'en');
                 setHasPlayed(true);
             }, 600);
             return () => clearTimeout(timer);
         }
-    }, [text, audioSettings.narration, hasPlayed, playAudio]);
+    }, [text, audioSettings.autoPlay, hasPlayed, playAudio]);
 
     if (!text) return null;
 
     return (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 flex gap-3 items-start animate-in fade-in slide-in-from-top-2">
             <div className="bg-blue-100 dark:bg-blue-800 p-2 rounded-full shrink-0">
-                <Volume2 className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                <AudioPlayer text={text} size="sm" className="text-blue-600 dark:text-blue-300 pointer-events-none" />
             </div>
             <div className="space-y-1">
                 <p className="text-sm font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wider">Teacher</p>
                 <p className="text-base text-blue-900 dark:text-blue-100 leading-relaxed">{text}</p>
             </div>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto text-blue-500 hover:text-blue-700 hover:bg-blue-100/50"
-                onClick={() => playAudio(text, 'en')}
-            >
-                <Volume2 className="h-4 w-4" />
-            </Button>
+            <AudioPlayer text={text} className="ml-auto text-blue-500 hover:text-blue-700" size="sm" />
         </div>
     );
 }
 
 // --- Vocabulary Module ---
 export function VocabularyView({ module, onComplete }: { module: VocabularyModule; onComplete?: () => void }) {
-    const playAudio = useLessonAudio();
-
     // Auto-complete vocabulary on mount (or could require clicking all cards?)
     useEffect(() => {
         if (onComplete) onComplete();
@@ -93,14 +94,7 @@ export function VocabularyView({ module, onComplete }: { module: VocabularyModul
                                         <p className="text-xs text-muted-foreground/50">{item.translit_spelling}</p>
                                     )}
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                    onClick={() => playAudio(item.audio_text_ru || item.russian)}
-                                >
-                                    <Volume2 className="h-4 w-4" />
-                                </Button>
+                                <AudioPlayer text={item.audio_text_ru || item.russian} />
                             </div>
                             <div className="mt-2 text-sm">
                                 <p className="font-semibold">{item.english}</p>
@@ -119,8 +113,6 @@ export function VocabularyView({ module, onComplete }: { module: VocabularyModul
 
 // --- Grammar Module ---
 export function GrammarView({ module, onComplete }: { module: GrammarModule; onComplete?: () => void }) {
-    const playAudio = useLessonAudio();
-
     // Auto-complete grammar on mount
     useEffect(() => {
         if (onComplete) onComplete();
@@ -146,19 +138,22 @@ export function GrammarView({ module, onComplete }: { module: GrammarModule; onC
                 {module.minimalPairs && module.minimalPairs.map((pair, idx) => (
                     <div
                         key={idx}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-card hover:bg-muted/10 transition cursor-pointer group"
-                        onClick={() => playAudio(pair.audio_text_ru || `${pair.base}. ${pair.contrast}`)}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-card hover:bg-muted/10 transition group relative"
                     >
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-blue-500">BASE</span>
-                                <Volume2 className="h-3 w-3 opacity-0 group-hover:opacity-50" />
                             </div>
-                            <p className="text-lg" lang="ru">{pair.base}</p>
+                            <div className="flex justify-between items-center">
+                                <p className="text-lg" lang="ru">{pair.base}</p>
+                            </div>
                         </div>
                         <div className="space-y-1">
                             <span className="text-xs font-bold text-pink-500">CONTRAST</span>
-                            <p className="text-lg font-medium" lang="ru">{pair.contrast}</p>
+                            <div className="flex justify-between items-center">
+                                <p className="text-lg font-medium" lang="ru">{pair.contrast}</p>
+                                <AudioPlayer text={pair.audio_text_ru || `${pair.base}. ${pair.contrast}`} size="sm" className="opacity-70 group-hover:opacity-100" />
+                            </div>
                             <p className="text-sm text-muted-foreground italic border-l-2 border-primary/20 pl-2 mt-1">{pair.explanation}</p>
                         </div>
                     </div>
@@ -169,9 +164,6 @@ export function GrammarView({ module, onComplete }: { module: GrammarModule; onC
 }
 
 // --- Drill Module ---
-import { ClozeDrill } from "@/components/drills/ClozeDrill";
-import { TransformationDrill } from "@/components/drills/TransformationDrill";
-import { MinimalPairDrill } from "@/components/drills/MinimalPairDrill";
 
 export function DrillView({ module, onComplete, onResult }: {
     module: DrillModule;
@@ -186,6 +178,10 @@ export function DrillView({ module, onComplete, onResult }: {
     // v1.3 Smart Validation State
     const [validationResult, setValidationResult] = useState<{ isCorrect: boolean; isClose: boolean; feedback: string } | null>(null);
     const [isValidating, setIsValidating] = useState(false);
+
+    // AI Explanation State
+    const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+    const [isExplaining, setIsExplaining] = useState(false);
 
     // Phase 2: Error Logging
     const { logError, audioSettings, apiKey } = useAppStore();
@@ -296,6 +292,8 @@ export function DrillView({ module, onComplete, onResult }: {
             setIsSubmitted(false);
             setValidationResult(null);
             setIsValidating(false);
+            setAiExplanation(null); // Reset explanation
+            setIsExplaining(false);
         }
     };
 
@@ -348,52 +346,80 @@ export function DrillView({ module, onComplete, onResult }: {
 
         setIsValidating(true);
         let isAnswerCorrect = false;
+        let aiValidationSuccess = false;
 
-        // Smart Validation using LLM
+        // 1. Smart Validation using LLM
         if (apiKey) {
             try {
                 const { validateAnswer } = await import("@/lib/openai");
-                const result = await validateAnswer(apiKey, question.prompt, inputAnswer, question.correctAnswer);
+                const q = question as any;
+                const result = await validateAnswer(apiKey, q.prompt, inputAnswer, q.correctAnswer);
                 setValidationResult(result);
                 isAnswerCorrect = result.isCorrect;
+                aiValidationSuccess = true;
             } catch (error) {
                 console.error("Validation failed", error);
-                // Fallback
-                const correct = inputAnswer.trim().toLowerCase() === question.correctAnswer.toLowerCase();
+                // Fall through to local
+            }
+        }
+
+        // 2. Local Fallback (if no API key or AI failed)
+        if (!aiValidationSuccess) {
+            if ('answer_key' in question && question.answer_key) {
+                const validation = validateInput(inputAnswer, question.answer_key);
+                setValidationResult({
+                    isCorrect: validation.isCorrect,
+                    isClose: validation.isClose,
+                    feedback: validation.feedback || (validation.isCorrect ? "Correct!" : "Incorrect.")
+                });
+                isAnswerCorrect = validation.isCorrect;
+            } else {
+                const correct = inputAnswer.trim().toLowerCase() === (question as any).correctAnswer?.toLowerCase();
                 setValidationResult({
                     isCorrect: correct,
                     isClose: false,
-                    feedback: correct ? "Correct!" : "Checking failed."
+                    feedback: correct ? "Correct!" : "Incorrect."
                 });
                 isAnswerCorrect = correct;
             }
-        } else {
-            // Fallback for no API key (Exact match)
-            const correct = inputAnswer.trim().toLowerCase() === question.correctAnswer.toLowerCase();
-            setValidationResult({
-                isCorrect: correct,
-                isClose: false,
-                feedback: correct ? "Correct!" : "Incorrect."
-            });
-            isAnswerCorrect = correct;
         }
 
         if (onResult) onResult(isAnswerCorrect);
 
         if (!isAnswerCorrect) {
-            const tag = question.subtype
-                ? `input_${question.subtype}`
+            const q = question as any;
+            const tag = q.subtype
+                ? `input_${q.subtype}`
                 : 'input_general';
 
             logError(tag, {
-                prompt: question.prompt,
+                prompt: q.prompt,
                 error: inputAnswer,
-                correct: question.correctAnswer
+                correct: q.correctAnswer
             });
         }
 
         setIsSubmitted(true);
         setIsValidating(false);
+    };
+
+    const handleExplain = async () => {
+        if (!apiKey) return;
+        setIsExplaining(true);
+        try {
+            const q = question as any;
+            const result = await explainError(
+                apiKey,
+                question.type === 'selection' ? (q.question as string) : (q.prompt as string) || "Question",
+                question.type === 'selection' ? currentOptions[selectedOption || 0] : inputAnswer,
+                q.correctAnswer || ""
+            );
+            setAiExplanation(result);
+        } catch (e) {
+            setAiExplanation("Could not load explanation.");
+        } finally {
+            setIsExplaining(false);
+        }
     };
 
     return (
@@ -405,9 +431,7 @@ export function DrillView({ module, onComplete, onResult }: {
                 <div className="flex items-center gap-2">
                     {/* Audio button for standard questions */}
                     {(question.type === 'selection' || question.type === 'input') && question.audio_text_ru && (
-                        <Button variant="ghost" size="sm" onClick={() => playAudio(question.audio_text_ru)}>
-                            <Volume2 className="h-4 w-4" />
-                        </Button>
+                        <AudioPlayer text={question.audio_text_ru} size="sm" />
                     )}
                     <Badge variant="outline">Question {currentIndex + 1} / {module.exercises.length}</Badge>
                 </div>
@@ -470,14 +494,7 @@ export function DrillView({ module, onComplete, onResult }: {
                                     {question.subtype === 'pronunciation' ? (
                                         <div className="flex flex-col items-center gap-2">
                                             <span lang="ru">{question.textToDisplay}</span>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => playAudio(question.audio_text_ru || question.textToDisplay || "")}
-                                                className="mt-2"
-                                            >
-                                                <Volume2 className="h-4 w-4 mr-2" /> Listen
-                                            </Button>
+                                            <AudioPlayer text={question.audio_text_ru || question.textToDisplay || ""} size="sm" className="mt-2" />
                                         </div>
                                     ) : (
                                         question.textToDisplay || question.translation
@@ -583,7 +600,7 @@ export function DrillView({ module, onComplete, onResult }: {
                                 {validationResult.isCorrect ? <CheckCircle2 className="h-5 w-5 mt-0.5" /> :
                                     validationResult.isClose ? <AlertCircle className="h-5 w-5 mt-0.5" /> :
                                         <XCircle className="h-5 w-5 mt-0.5" />}
-                                <div>
+                                <div className="space-y-2 w-full">
                                     <p className="font-bold">{validationResult.feedback}</p>
                                     {!validationResult.isCorrect && (
                                         <div className="mt-2 space-y-1">
@@ -601,6 +618,38 @@ export function DrillView({ module, onComplete, onResult }: {
                                     )}
                                     {question.type === 'selection' && (
                                         <p className="text-sm mt-1 opacity-90">{question.explanation}</p>
+                                    )}
+
+                                    {/* AI Explanation Button / Result */}
+                                    {!validationResult.isCorrect && apiKey && (
+                                        <div className="pt-2">
+                                            {aiExplanation ? (
+                                                <div className="p-3 bg-white/50 rounded-lg border border-black/5 animate-in fade-in">
+                                                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-1 opacity-70">
+                                                        <Sparkles className="h-3 w-3" /> AI Analysis
+                                                    </div>
+                                                    <p className="text-sm leading-relaxed">{aiExplanation}</p>
+                                                </div>
+                                            ) : (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-auto p-0 hover:bg-transparent hover:underline"
+                                                    onClick={handleExplain}
+                                                    disabled={isExplaining}
+                                                >
+                                                    {isExplaining ? (
+                                                        <>
+                                                            <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Asking AI...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Sparkles className="h-3 w-3 mr-1" /> Explain Mistake
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>

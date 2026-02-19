@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, BookOpen, HelpCircle } from "lucide-react";
+import { BookOpen, HelpCircle } from "lucide-react";
 import type { StoryModule, DrillModule } from "@/types/lesson";
 import { useAppStore } from "@/store";
 import { playText } from "@/lib/audio";
+import { AudioPlayer } from "@/components/AudioPlayer";
 import { DrillView } from "./LessonModules";
 
 interface StoryViewProps {
@@ -20,16 +21,6 @@ export function StoryView({ module, onComplete }: StoryViewProps) {
     // Simple glossing interaction
     const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
-    const playStoryAudio = () => {
-        if (module.audio_text_ru) {
-            playText(module.audio_text_ru, {
-                voiceURI: audioSettings.voiceURI,
-                speed: audioSettings.speed * 0.9, // Slightly slower for stories
-                lang: 'ru'
-            });
-        }
-    };
-
     const handleWordClick = (word: string) => {
         // Normalize word to find in vocabulary list
         const cleanWord = word.replace(/[.,!?;:()]/g, "").toLowerCase();
@@ -38,7 +29,11 @@ export function StoryView({ module, onComplete }: StoryViewProps) {
         if (gloss) {
             setSelectedWord(`${gloss.russian} - ${gloss.english}`);
             // Also play the word audio?
-            playText(gloss.russian, { voiceURI: audioSettings.voiceURI, speed: 1, lang: 'ru' });
+            playText(gloss.russian, {
+                voiceURI: audioSettings.voiceURI,
+                speed: audioSettings.speed, // Use global speed
+                lang: 'ru'
+            });
         } else {
             setSelectedWord(null);
         }
@@ -60,9 +55,14 @@ export function StoryView({ module, onComplete }: StoryViewProps) {
                     <h2 className="text-2xl font-bold">{module.title}</h2>
                 </div>
                 {module.audio_text_ru && (
-                    <Button variant="secondary" size="icon" onClick={playStoryAudio} title="Listen to Story">
-                        <Volume2 className="h-5 w-5" />
-                    </Button>
+                    <AudioPlayer
+                        text={module.audio_text_ru}
+                        size="default"
+                        variant="secondary"
+                    // For stories, maybe we want it slower by default? Or just respect user settings?
+                    // Let's respect user settings but maybe hint it.
+                    // Actually, AudioPlayer uses global speed by default if not provided.
+                    />
                 )}
             </div>
 

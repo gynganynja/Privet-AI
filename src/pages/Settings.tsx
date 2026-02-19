@@ -190,20 +190,47 @@ function AudioSettingsSection() {
                         )}
 
                         {/* Speed Slider */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between">
-                                <label className="text-sm font-medium">Playback Speed</label>
-                                <span className="text-sm text-muted-foreground">{audioSettings.speed}x</span>
+                        <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                            <label className="text-sm font-medium">Playback Speed</label>
+
+                            <div className="flex items-center gap-4">
+                                <Button
+                                    variant={audioSettings.speed === 0.75 ? "default" : "outline"}
+                                    onClick={() => setAudioSettings({ speed: 0.75 })}
+                                    className="flex-1"
+                                >
+                                    Slow (0.75x)
+                                </Button>
+                                <Button
+                                    variant={audioSettings.speed === 1.0 ? "default" : "outline"}
+                                    onClick={() => setAudioSettings({ speed: 1.0 })}
+                                    className="flex-1"
+                                >
+                                    Normal (1.0x)
+                                </Button>
+                                <Button
+                                    variant={audioSettings.speed === 1.25 ? "default" : "outline"}
+                                    onClick={() => setAudioSettings({ speed: 1.25 })}
+                                    className="flex-1"
+                                >
+                                    Fast (1.25x)
+                                </Button>
                             </div>
-                            <input
-                                type="range"
-                                min="0.5"
-                                max="1.5"
-                                step="0.1"
-                                className="w-full accent-primary"
-                                value={audioSettings.speed}
-                                onChange={(e) => setAudioSettings({ speed: parseFloat(e.target.value) })}
-                            />
+
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => playText("Привет, меня зовут Анна. Как твои дела?", {
+                                        voiceURI: audioSettings.voiceURI,
+                                        speed: audioSettings.speed
+                                    })}
+                                >
+                                    <PlayCircle className="h-4 w-4 mr-2" />
+                                    Test Current Speed
+                                </Button>
+                            </div>
                         </div>
 
                         {/* Auto-play Toggle */}
@@ -219,18 +246,6 @@ function AudioSettingsSection() {
                                 onChange={(e) => setAudioSettings({ autoPlay: e.target.checked })}
                             />
                         </div>
-
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => playText("Это тест звука. Один, два, три.", {
-                                voiceURI: audioSettings.voiceURI,
-                                speed: audioSettings.speed
-                            })}
-                        >
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Test Audio Settings
-                        </Button>
                     </>
                 )}
             </CardContent>

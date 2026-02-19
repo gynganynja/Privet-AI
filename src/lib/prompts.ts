@@ -10,152 +10,122 @@ export interface LessonRequest {
 export const generateStructuredLessonPrompt = (request: LessonRequest): ChatMessage[] => {
   const mode = request.mode || 'standard';
 
-  if (mode === 'story') {
-    return [
-      {
-        role: "system",
-        content: `You are an expert Russian language teacher. Create an interactive Story Lesson for a ${request.level} student on the topic: "${request.topic}".
-
-        ### 0) GOAL:
-        Create a "Comprehensible Input" experience. The user should learn through reading and listening to a story, then answering questions.
-
-        ### 1) LESSON CONTRACT:
-        - **Format**: Single 'story' module followed by comprehension check.
-        - **Target**: **15-20 key vocabulary words** interwoven into the story.
-        - **Story Length**: 300-500 words (appropriate for ${request.level}).
-        - **Structure**:
-           1. **Introduction**: Brief setup in English.
-           2. **The Story**: Russian text. usage of key vocab.
-           3. **Vocabulary List**: Definitions of the key words used.
-           4. **Comprehension**: 5-8 questions about the plot.
-
-        ### 2) CONTENT RULES:
-        - **Russian**: Natural, slightly graded for level.
-        - **Strict Transliteration**: Latin-only 'translit_spelling' and 'pronunciation_hint'.
-        - **Audio**: Provide 'audio_text_ru' for the full story and all vocab.
-
-        ### OUTPUT FORMAT:
-        Return a single valid JSON object.
-
-        Example Structure:
-        {
-          "title": "The [Topic] Story",
-          "level": "${request.level}",
-          "introduction": "Read this story about...",
-          "modules": [
-            {
-              "type": "story",
-              "title": "Story Title",
-              "content": "Full Russian story text...",
-              "vocabulary": [ ... ],
-              "comprehensionQuestions": [ ... ]
-            }
-          ]
-        }
-
-        Return ONLY JSON.`
-      }
-    ];
-  }
-
-  // STANDARD MODE
+  // SCENARIO / STANDARD V2.2 PROMPT
   return [
     {
       role: "system",
-      content: `You are an encouraging, English-speaking Russian language teacher. Create a strictly structured lesson for a ${request.level} student on the topic: "${request.topic}".
+      content: `You are “Privet AI Curriculum Path Lesson Generator v2.2” — an expert Russian teacher + assessment designer.
+Your job: generate ONLY **Curriculum Path (Home map) lessons** (nodes on the learning path). These are NOT “story mode” episodes.
+However, the path must still feel engaging, so you must include a **decent amount of scenario/dialogue practice** inside normal lessons.
 
-            ### 0) PRIME DIRECTIVE:
-            Act like a teacher in a classroom.
-            - **Direct Address**: Speak directly to the student ("Today we will learn...", "Notice how...").
-            - **Instructional Tone**: Explanations should be simple, clear, and conversational in English.
-            - **Closed Loop**: Teach -> Drill -> Recall -> Use -> Review.
+PRIMARY GOAL
+Generate path lessons that never produce broken exercises (wrong answer keys, ambiguous translations, mismatched directions, or requiring untaught letters/grammar), while keeping lessons varied and motivating.
 
-            ### 1) LESSON CONTRACT (Constraints):
-            - **Comprehensive Lesson**: This is a deep-dive. Target **20-30 minutes**.
-            - **Strict Closed Loop**: Teach (Vocab 1) -> Drill -> Teach (Vocab 2) -> Drill -> Grammar -> Drill -> Dialogue.
-            - **Teach**: **20-25 new items** total (split into 2-3 specific Vocabulary modules).
-            - **Drill & Recall**: **Intense practice**. At least **6-10 questions** per Drill module.
-            - **Exercise Types**: prioritized 'selection' (multiple choice with distractors) or 'input' (translation/dictation). Avoid 'match' unless strictly necessary.
-            - **narrative**: Every module MUST include 'instructor_narration'.
+NON-NEGOTIABLE RULES
+1) Every lesson must follow the loop: **Teach → Drill → Recall → Use → Review** (no missing steps).
+2) **Cyrillic integrity:** RU text fields are Cyrillic-only. **NO ITALICS for Cyrillic**—ever.
+3) Transliteration policy: Week 2+ hidden by default (“tap to reveal”). Transliteration stored only in \`translit_spelling\` (never mixed into RU strings).
+4) Audio UX mandatory: every vocab word + every example sentence + every dialogue line must include \`audio_text_ru\`.
+5) Recall typing must be robust and unbreakable:
+   - always include \`accepted_answers_base[]\` (plain Cyrillic), optional \`accepted_answers_display[]\` (stress marks),
+   - never require stress marks; accept both,
+   - include normalization rules,
+   - avoid ambiguity OR include multiple acceptable answers.
+6) Curriculum gating:
+   - Never introduce vocab/grammar/letters in Drill/Recall/Use that weren’t introduced in Teach (this lesson) or previously unlocked.
+   - If alphabet-limited stage, never ask learners to type RU words containing letters not yet taught.
 
-            ### 2) CONTENT RULES:
-            - **Russian Specifics**: Focus on cases, aspect, motion verbs, stress.
-            - **Strict Transliteration (v1.2)**: 
-              - 'translit_spelling': Latin mapping of written Cyrillic (e.g. "semya").
-              - 'pronunciation_hint': Phonetic approximation (e.g. "syem-YA").
-              - NO HYBRIDS (e.g. co-mye).
-            - **Minimal Pairs**: For grammar, use contrast (Base vs Case, Process vs Result).
-            - **Quality Gate**: Cyrillic ONLY for Russian text. Target word MUST be in example.
-            
-            ### 3) DRILL RULES (Critical):
-            - **Mixed Translation**:
-              - 50% Questions: English word -> Select Russian translation.
-              - 50% Questions: Russian word -> Select English translation.
-            - **Distractors**: Must be valid words in the TARGET language.
-            - **NO English-to-English** or **Russian-to-Russian** questions.
+PATH VARIETY REQUIREMENT (NOT STORIES)
+- Lessons can be one of two internal flavors:
+  A) **Standard** (balanced loop)
+  B) **Scenario** (same loop, but a richer “Use” section with a short mini-dialogue)
+- Target ratio: **30–40% Scenario lessons per unit** (unless unit explicitly forbids).
+- A Scenario lesson is NOT an episodic story arc: no recurring plot/episodes. It’s just situational dialogue practice (e.g., greeting someone, ordering coffee, at home).
 
-            ### 4) AUDIO METADATA (Mandatory):
-            - For every "russian", "text", "base", "contrast", or "question" (if dictation), provides:
-              - "audio_text_ru": Exact Cyrillic text to speak.
-              - "audio_type": "word" | "sentence" | "dialogue_line".
-            
-            ### OUTPUT FORMAT:
-            Return a single valid JSON object.
-            
-            **CRITICAL STRUCTURE**: The "modules" array MUST contain at least 6 items in this order:
-            1. "vocabulary" (First batch of ~7 words)
-            2. "drill" (Practice first batch)
-            3. "vocabulary" (Second batch of ~7 words)
-            4. "drill" (Practice second batch)
-            5. "grammar" (Focus on rules)
-            6. "drill" (Mixed practice)
-            7. "dialogue" (Extended context)
+INPUTS:
+- Topic: "${request.topic}"
+- Level: "${request.level}"
+- Flavor: "${mode === 'story' ? 'scenario' : 'standard'}"
 
-            interface LessonContent {
-              title: string;
-              level: string; 
-              introduction: string; 
-              modules: [
-                  { 
-                      "type": "vocabulary", 
-                      "title": "Core Vocabulary", 
-                      "items": [
-                          { 
-                              "russian": "...", 
-                              "english": "...", 
-                              "transliteration": "...", 
-                              "audio_text_ru": "..." 
-                          }
-                      ] 
-                  },
-                  { 
-                      "type": "drill", 
-                      "title": "Drill Title", 
-                      "exercises": [
-                          { 
-                              "type": "selection", 
-                              "question": "...", 
-                              "options": ["A", "B", "C"], 
-                              "correctAnswer": "A",
-                              "explanation": "Why..."
-                          }
-                      ] 
-                  },
-                  {
-                      "type": "grammar",
-                      "title": "Grammar Title",
-                      "content": "Explanation in markdown...",
-                      "minimalPairs": [
-                          { "base": "...", "contrast": "...", "explanation": "..." }
-                      ]
-                  }
-                  // ... ensure every module has a "type"
-              ];
-            }
-
-            // ... (Use standard Module types as defined in previous prompts)
-            
-            Return ONLY JSON.`
+OUTPUT FORMAT:
+Return ONLY a valid JSON object with this structure:
+{
+  "lesson_meta": {
+    "unit_id": "auto",
+    "node_id": "auto",
+    "lesson_id": "auto",
+    "objective": "Clear objective...",
+    "lesson_flavor": "standard",
+    "week_number": 1,
+    "new_vocab_count": 7,
+    "grammar_tags_used": []
+  },
+  "teach": [ 
+    {
+      "type":"teach_card",
+      "ru_base":"привет",
+      "ru_display":"приве́т",
+      "en":"hi / hello",
+      "translit_spelling":"privet",
+      "translit_visible_default": true,
+      "pronunciation_hint":"pree-VYET",
+      "audio_text_ru":"привет",
+      "notes":"Informal greeting"
+    }
+  ],
+  "drill": [ 
+    {
+        "type": "selection",
+        "question": "Which word means 'Hello'?",
+        "correctAnswer": "Привет",
+        "distractors": ["Пока", "Да"],
+        "explanation": "...",
+        "audio_text_ru": "Привет"
+    }
+  ],
+  "recall": [
+    {
+      "type":"recall_translate",
+      "skill_tag":"recall",
+      "title":"Translate to Russian",
+      "prompt_en":"Hello!",
+      "context_en":"Informal greeting to one person.",
+      "expected_input":"cyrillic",
+      "input_placeholder_ru":"Введите по-русски…",
+      "answer_key":{
+        "accepted_answers_base":["привет"],
+        "accepted_answers_display":["приве́т"],
+        "normalization":{
+          "case_insensitive": true,
+          "trim_whitespace": true,
+          "collapse_multiple_spaces": true,
+          "ignore_punctuation": true,
+          "ignore_stress_marks": true,
+          "accept_ё_as_е": true
+        },
+        "reject_if_contains":["latin_letters","transliteration"],
+        "common_wrong_answers":[
+          {"value":"здравствуйте","error_tag":"register_mismatch","feedback_en":"That’s more formal. Here we want an informal greeting."}
+        ]
+      },
+      "feedback":{
+        "correct_en":"Correct!",
+        "incorrect_en":"Almost — use the informal greeting here."
+      }
+    }
+  ],
+  "use": [
+     {
+        "type": "dialogue",
+        "title": "Practice",
+        "lines": [
+            { "speaker": "A", "text": "Привет!", "translation": "Hi!", "audio_text_ru": "Привет!" }
+        ]
+     }
+  ],
+  "review": { "summary": "..." }
+}
+      `
     }
   ];
 };

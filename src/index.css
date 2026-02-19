@@ -22,44 +22,68 @@
 
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 222 47% 11%;
+        /* Privet AI Palette Anchors */
+        /* Primary Blue #0036A7 -> HSL 221 100% 33% */
+        --primary-blue: 221 100% 33%;
+        /* Primary Red #D62718 -> HSL 5 79% 47% */
+        --primary-red: 5 79% 47%;
+        /* Primary White #FFFFFF */
+        --primary-white: 0 0% 100%;
+        /* Secondary Blue #2D5CB9 -> HSL 221 61% 45% */
+        --secondary-blue: 221 61% 45%;
+        /* Neutral Light #F5F7FA -> HSL 216 27% 97% */
+        --neutral-light: 216 27% 97%;
+        /* Neutral Dark #1D1D1B -> HSL 240 5% 11% */
+        --neutral-dark: 240 5% 11%;
+        /* Accent Teal #2DA1C3 -> HSL 193 63% 47% */
+        --accent-teal: 193 63% 47%;
+        /* Success Green #219653 -> HSL 146 63% 36% (Color Exception for Semantic Success) */
+        --success-green: 146 63% 36%;
+        /* Error Background #FDEDEC -> HSL 4 80% 96% */
+        --error-bg: 4 80% 96%;
+
+        /* Shadcn / Semantic Mapping */
+        --background: var(--neutral-light);
+        /* #F5F7FA */
+        --foreground: var(--neutral-dark);
+        /* #1D1D1B */
 
         --card: 0 0% 100%;
-        --card-foreground: 222 47% 11%;
+        --card-foreground: var(--neutral-dark);
 
         --popover: 0 0% 100%;
-        --popover-foreground: 222 47% 11%;
+        --popover-foreground: var(--neutral-dark);
 
-        --primary: 199 89% 48%;
-        --primary-foreground: 210 40% 98%;
+        --primary: var(--primary-blue);
+        --primary-foreground: 0 0% 100%;
 
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222 47% 11%;
+        --secondary: var(--secondary-blue);
+        --secondary-foreground: 0 0% 100%;
 
         --muted: 210 40% 96.1%;
         --muted-foreground: 215 16% 47%;
 
-        --accent: 199 80% 95%;
-        --accent-foreground: 222 47% 11%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: var(--neutral-dark);
 
-        --destructive: 0 84% 60%;
-        --destructive-foreground: 210 40% 98%;
+        --destructive: var(--primary-red);
+        --destructive-foreground: 0 0% 100%;
 
         --border: 214.3 31.8% 91.4%;
         --input: 214.3 31.8% 91.4%;
-        --ring: 199 89% 48%;
+        --ring: var(--primary-blue);
 
         --radius: 0.75rem;
-
-        --chart-1: 199 89% 48%;
-        --chart-2: 222 47% 11%;
-        --chart-3: 0 84% 60%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
+        /* 12px for cards */
     }
 
     .dark {
+        /* Dark Mode Strategy:
+           Surface: #121212
+           Card Surface: #1E1E1E
+           Text: #F5F7FA
+           Action Blue Exception: #4A85F6 (Lighter for contrast)
+        */
         --background: 222 47% 11%;
         --foreground: 210 40% 98%;
 
@@ -69,7 +93,9 @@
         --popover: 222 47% 14%;
         --popover-foreground: 210 40% 98%;
 
-        --primary: 199 89% 48%;
+        /* Color Exception: Lighter Blue for Dark Mode Contrast */
+        --primary: 217 91% 60%;
+        /* #4A85F6 */
         --primary-foreground: 222 47% 11%;
 
         --secondary: 217 33% 17%;
@@ -86,13 +112,7 @@
 
         --border: 217 33% 17%;
         --input: 217 33% 17%;
-        --ring: 199 89% 48%;
-
-        --chart-1: 199 89% 48%;
-        --chart-2: 210 40% 98%;
-        --chart-3: 0 84% 60%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
+        --ring: 212.7 26.8% 83.9%;
     }
 }
 
@@ -127,6 +147,9 @@
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
+
+    /* Custom Tokens */
+    --color-success: hsl(var(--success-green));
 }
 
 @layer base {
@@ -137,6 +160,29 @@
     body {
         background-color: hsl(var(--background));
         color: hsl(var(--foreground));
-        @apply font-sans;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* 
+      CYRILLIC TYPOGRAPHY HARD RULE 
+      Constraint: No Italics for Cyrillic. Even if <em> or <i> is used.
+    */
+    :lang(ru),
+    :lang(uk),
+    :lang(be),
+    :lang(bg),
+    :lang(sr) {
+        font-style: normal !important;
+        font-family: 'Inter', 'Noto Sans', 'Roboto', 'Segoe UI', Arial, sans-serif;
+    }
+
+    /* Allow italics only for explicitly marked English if needed */
+    :lang(en).allow-italics {
+        font-style: italic;
+    }
+
+    /* Global utility to force removal of italics */
+    .no-italics {
+        font-style: normal !important;
     }
 }

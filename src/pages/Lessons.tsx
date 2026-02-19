@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom"; // Added useParams, useNavigate
 import { useAppStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,14 +9,18 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { generateResponse } from "@/lib/openai";
 import { generateStructuredLessonPrompt } from "@/lib/prompts";
 import { VocabularyView, GrammarView, DrillView, DialogueView } from "@/components/LessonModules";
+import { RecallView } from "@/components/RecallView";
 import { StoryView } from "@/components/StoryView";
 import { SessionSummary } from "@/components/SessionSummary";
-import { type SavedLesson, type LessonContent } from "@/types/lesson";
+import { type SavedLesson, type LessonContent, type DrillModule } from "@/types/lesson";
 import { Loader2, ChevronLeft, ChevronRight, Save, Layers, CheckCircle2, BookOpen, AlertCircle, Trash2, PlayCircle, BookMarked, GraduationCap } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { COURSE_CONTENT } from "@/data/courseContent"; // Import Course Content
 
 export default function LessonsPage() {
-    const { apiKey, saveLesson, addDeck, savedLessons, deleteLesson } = useAppStore();
+    const { id: lessonId } = useParams(); // Get lesson ID from URL
+    const navigate = useNavigate();
+    const { apiKey, saveLesson, addDeck, savedLessons, deleteLesson, completeNode } = useAppStore();
 
     // State
     const [selectedTopic, setSelectedTopic] = useState("");
@@ -39,8 +44,13 @@ export default function LessonsPage() {
         }
     }, [currentModuleIndex]);
 
-    const handleGenerateLesson = async () => {
-        if (!selectedTopic.trim()) return;
+    // NEW: Auto-load structured lesson if ID is present
+    const hasInitialized = useRef(false);
+
+    const handleGenerateLesson = useCallback(async (topicOverride?: string, levelOverride?: string, focusPoints?: string[]) => {
+        const topic = topicOverride || selectedTopic;
+        if (!topic.trim()) return;
+
         if (!apiKey) {
             setError("Please set your OpenAI API Key in Settings first.");
             return;
@@ -51,9 +61,14 @@ export default function LessonsPage() {
         setSessionStats({ total: 0, correct: 0 });
 
         try {
+            // Construct a more specific topic if focus points exist
+            const enhancedTopic = focusPoints
+                ? `${topic}. Focus strictly on these elements: ${focusPoints.join(", ")}`
+                : topic;
+
             const messages = generateStructuredLessonPrompt({
-                topic: selectedTopic,
-                level: 'Beginner',
+                topic: enhancedTopic,
+                level: (levelOverride as any) || 'Beginner',
                 mode: lessonMode
             });
             const response = await generateResponse(apiKey, messages);
@@ -63,13 +78,83 @@ export default function LessonsPage() {
             }
 
             // Parse response
-            // The prompt asks for strictly JSON, but we might need to exact it if there's markdown
             const jsonStr = response.content.replace(/```json/g, "").replace(/```/g, "").trim();
-            const content: LessonContent = JSON.parse(jsonStr);
+            const parsedData = JSON.parse(jsonStr);
+
+            let modules: any[] = [];
+
+            if (parsedData.modules) {
+                // V1 Legacy Format
+                modules = parsedData.modules;
+            } else if (parsedData.teach || parsedData.drill) {
+                // V2 Adapter Logic
+                // 1. Teach -> Vocabulary
+                if (parsedData.teach && parsedData.teach.length > 0) {
+                    modules.push({
+                        type: 'vocabulary',
+                        title: 'New Vocabulary',
+                        items: parsedData.teach.map((t: any) => ({
+                            russian: t.ru_base,
+                            russianWithStress: t.ru_display,
+                            english: t.en,
+                            translit_spelling: t.translit_spelling,
+                            pronunciation_hint: t.pronunciation_hint,
+                            audio_text_ru: t.audio_text_ru,
+                            context: t.notes || "",
+                            contextEnglish: ""
+                        }))
+                    });
+                }
+
+                // 2. Drill -> DrillModule (Recognition)
+                if (parsedData.drill && parsedData.drill.length > 0) {
+                    modules.push({
+                        type: 'drill',
+                        title: 'Practice',
+                        exercises: parsedData.drill
+                    });
+                }
+
+                // 3. Recall -> DrillModule (Production)
+                if (parsedData.recall && parsedData.recall.length > 0) {
+                    modules.push({
+                        type: 'drill',
+                        title: 'Recall',
+                        exercises: parsedData.recall.map((r: any) => ({
+                            type: 'input',
+                            subtype: 'translate_en_to_ru',
+                            prompt: r.prompt_en,
+                            correctAnswer: r.answer_key?.accepted_answers_base?.[0] || "",
+                            answer_key: r.answer_key,
+                            textToDisplay: r.prompt_en,
+                            explanation: r.feedback?.incorrect_en,
+                            audio_text_ru: r.audio_text_ru
+                        }))
+                    });
+                }
+
+                // 4. Use -> Dialogue or Drill
+                if (parsedData.use && parsedData.use.length > 0) {
+                    // Check if it's a dialogue or just more drills
+                    const dialogues = parsedData.use.filter((u: any) => u.type === 'dialogue');
+                    if (dialogues.length > 0) {
+                        dialogues.forEach((d: any) => modules.push(d));
+                    }
+                }
+
+                // 5. Review (ignored for now or add as a summary card?)
+            }
+
+            const content: LessonContent = {
+                title: parsedData.lesson_meta?.objective || parsedData.title || "New Lesson",
+                level: parsedData.lesson_meta?.week_number ? `Week ${parsedData.lesson_meta.week_number}` : (parsedData.level || "Beginner"),
+                introduction: parsedData.introduction || "",
+                modules: modules
+            };
 
             // Wrap in SavedLesson structure
             const newLesson: SavedLesson = {
-                id: Date.now().toString(),
+                id: lessonId || Date.now().toString(), // Use URL ID if available
                 content: content,
                 createdAt: Date.now()
             };
@@ -84,7 +169,36 @@ export default function LessonsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [apiKey, lessonMode, selectedTopic, lessonId]);
+
+    // Initialize Lesson from ID
+    useEffect(() => {
+        if (!lessonId || hasInitialized.current) return;
+
+        // Find the node in COURSE_CONTENT
+        let foundNode = null;
+        for (const unit of COURSE_CONTENT.units) {
+            const node = unit.nodes.find(n => n.id === lessonId);
+            if (node) {
+                foundNode = node;
+                break;
+            }
+        }
+
+        if (foundNode && foundNode.type === 'lesson') {
+            hasInitialized.current = true;
+            // Auto-start generation
+            // We use the node's content metadata to feed the generator
+            if (foundNode.content) {
+                handleGenerateLesson(
+                    foundNode.content.topic,
+                    foundNode.content.level,
+                    foundNode.content.focusPoints
+                );
+            }
+        }
+    }, [lessonId, handleGenerateLesson]);
+
 
     const handleLoadLesson = (lesson: SavedLesson) => {
         setLessonData(lesson);
@@ -148,18 +262,25 @@ export default function LessonsPage() {
         const normalizedType = module.type?.toLowerCase() || 'unknown';
 
         // Ensure key changes on index change to force remount/reset of internal state
-        const props = {
-            key: currentModuleIndex,
+        const commonProps = {
             module: module as any, // Type casting to satisfy union discrimination if needed
             onComplete: handleStepComplete
         };
 
         switch (normalizedType) {
-            case 'vocabulary': return <VocabularyView {...props} />;
-            case 'grammar': return <GrammarView {...props} />;
-            case 'drill': return <DrillView {...props} onResult={handleDrillResult} />;
-            case 'dialogue': return <DialogueView {...props} />;
-            case 'story': return <StoryView {...props} />;
+            case 'vocabulary': return <VocabularyView key={currentModuleIndex} {...commonProps} />;
+            case 'grammar': return <GrammarView key={currentModuleIndex} {...commonProps} />;
+            case 'drill':
+                // Heuristic: If it contains 'input' exercises, it's a RECALL module
+                const drillModule = module as DrillModule;
+                const isRecall = drillModule.exercises.some(ex => ex.type === 'input' || ex.type === 'cloze');
+
+                if (isRecall) {
+                    return <RecallView key={currentModuleIndex} {...commonProps} />;
+                }
+                return <DrillView key={currentModuleIndex} {...commonProps} onResult={handleDrillResult} />;
+            case 'dialogue': return <DialogueView key={currentModuleIndex} {...commonProps} />;
+            case 'story': return <StoryView key={currentModuleIndex} {...commonProps} />;
             default:
                 console.error("Unknown module type:", module);
                 return (
@@ -234,7 +355,7 @@ export default function LessonsPage() {
                                 <Button
                                     className="w-full"
                                     size="lg"
-                                    onClick={handleGenerateLesson}
+                                    onClick={() => handleGenerateLesson()} // Explicitly call with no args to match signature
                                     disabled={isLoading || !selectedTopic.trim()}
                                 >
                                     {isLoading ? (
@@ -358,14 +479,26 @@ export default function LessonsPage() {
                                     correctCount={sessionStats.correct}
                                 />
 
-                                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
                                     <Button onClick={handleSaveLessonOnly} variant="outline">
                                         <Save className="h-4 w-4 mr-2" />
                                         Save Lesson Only
                                     </Button>
-                                    <Button onClick={handleSaveVocabulary}>
+                                    <Button onClick={handleSaveVocabulary} variant="outline">
                                         <Layers className="h-4 w-4 mr-2" />
                                         Save + Create Flashcards
+                                    </Button>
+                                    <Button
+                                        size="lg"
+                                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => {
+                                            if (lessonId) completeNode(lessonId);
+                                            completeNode("lesson-completed"); // Fallback for XP if no ID
+                                            navigate('/');
+                                        }}
+                                    >
+                                        <CheckCircle2 className="h-5 w-5 mr-2" />
+                                        Complete & Finish
                                     </Button>
                                 </div>
                             </div>
@@ -400,8 +533,17 @@ export default function LessonsPage() {
                                 <ChevronRight className="h-4 w-4 ml-2" />
                             </Button>
                         ) : (
-                            // Last module: Button helps if they want to verify they are done, usually UI above handles it
-                            <Button variant="ghost" disabled className="opacity-0">Last Step</Button>
+                            <Button
+                                onClick={() => {
+                                    if (lessonId) completeNode(lessonId);
+                                    completeNode("lesson-completed");
+                                    navigate('/');
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                Finish
+                                <CheckCircle2 className="h-4 w-4 ml-2" />
+                            </Button>
                         )}
                     </div>
                 </div>
