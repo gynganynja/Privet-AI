@@ -68,7 +68,7 @@ export function FeedbackSheet({
         try {
             const result = await onExplain();
             setExplanation(result);
-        } catch (e) {
+        } catch {
             setExplanation("Failed to load explanation.");
         } finally {
             setIsExplaining(false);

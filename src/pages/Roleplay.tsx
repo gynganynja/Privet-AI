@@ -88,12 +88,16 @@ const SCENARIOS = [
     }
 ];
 
+// Appended to every persona so conversations stay usable for a beginner.
+const LEARNER_GUIDANCE = " The learner is a beginner (A1–A2). Use short, simple sentences and common words. If they write in English or get stuck, reply with a simple Russian phrase they could use, followed by its English meaning in parentheses. Briefly correct real grammar mistakes in English parentheses, then stay in character.";
+
 export default function RoleplayPage() {
     const { apiKey, chatSessions, saveChatSession, clearChatSession } = useAppStore();
     const [selectedScenario, setSelectedScenario] = useState<typeof SCENARIOS[0] | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll logic
@@ -112,10 +116,10 @@ export default function RoleplayPage() {
         setSelectedScenario(scenario);
         // Load existing session or start new
         if (chatSessions[scenario.id] && chatSessions[scenario.id].length > 0) {
-            setMessages(chatSessions[scenario.id]);
+            setMessages(chatSessions[scenario.id] as ChatMessage[]);
         } else {
             const initialMessages: ChatMessage[] = [
-                { role: "system", content: scenario.systemPrompt },
+                { role: "system", content: scenario.systemPrompt + LEARNER_GUIDANCE },
                 { role: "assistant", content: "Здравствуйте! Чем я могу вам помочь?" }
             ];
             setMessages(initialMessages);
@@ -133,7 +137,7 @@ export default function RoleplayPage() {
         if (!selectedScenario) return;
         clearChatSession(selectedScenario.id);
         const initialMessages: ChatMessage[] = [
-            { role: "system", content: selectedScenario.systemPrompt },
+            { role: "system", content: selectedScenario.systemPrompt + LEARNER_GUIDANCE },
             { role: "assistant", content: "Здравствуйте! Чем я могу вам помочь?" }
         ];
         setMessages(initialMessages);
@@ -150,6 +154,7 @@ export default function RoleplayPage() {
         saveChatSession(selectedScenario.id, newMessages);
         setInputValue("");
         setIsLoading(true);
+        setError(null);
 
         try {
             const response = await generateResponse(apiKey, newMessages);
@@ -159,10 +164,9 @@ export default function RoleplayPage() {
                 setMessages(updatedMessages);
                 saveChatSession(selectedScenario.id, updatedMessages);
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error("Roleplay Error", error);
-            const errorMsg: ChatMessage = { role: "system", content: "Error: Could not generate response." };
-            setMessages([...newMessages, errorMsg]);
+            setError("Couldn't get a reply. Check your connection and API key, then send again.");
         } finally {
             setIsLoading(false);
         }
@@ -191,8 +195,11 @@ export default function RoleplayPage() {
     // SCENARIO SELECTION SCREEN
     if (!selectedScenario) {
         return (
-            <div className="container mx-auto max-w-5xl py-8 space-y-8 animate-in fade-in duration-500">
-                <div className="space-y-2 text-center md:text-left">
+            <div className="container mx-auto max-w-5xl py-6 px-4 space-y-8 animate-in fade-in duration-500">
+                <div className="space-y-2">
+                    <Link to="/practice" className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+                        <ArrowLeft className="h-4 w-4" /> Practice
+                    </Link>
                     <h1 className="text-3xl font-bold tracking-tight">Roleplay Scenarios</h1>
                     <p className="text-muted-foreground">Practice real-world conversations with AI personas.</p>
                 </div>
@@ -234,7 +241,7 @@ export default function RoleplayPage() {
 
     // CHAT INTERFACE
     return (
-        <div className="flex flex-col h-full max-w-6xl mx-auto w-full animate-in fade-in slide-in-from-right-8 duration-300">
+        <div className="flex flex-col h-full max-w-6xl mx-auto w-full p-4 animate-in fade-in slide-in-from-right-8 duration-300">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={exitScenario}>
@@ -250,7 +257,7 @@ export default function RoleplayPage() {
                 </Button>
             </div>
 
-            <div className="flex gap-4 h-[600px]">
+            <div className="flex gap-4 h-[calc(100dvh-14rem)] min-h-[400px]">
                 {/* Chat Area */}
                 <Card className="flex-[2] flex flex-col overflow-hidden shadow-lg border-primary/10">
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
@@ -268,6 +275,9 @@ export default function RoleplayPage() {
                                     </div>
                                 </div>
                             ))}
+                            {error && (
+                                <p className="text-sm text-destructive text-center">{error}</p>
+                            )}
                             {isLoading && (
                                 <div className="flex gap-3">
                                     <Avatar className="h-8 w-8">

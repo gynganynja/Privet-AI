@@ -26,12 +26,12 @@ export function normalizeText(text: string, rules: AnswerKey['normalization'] = 
 
     if (rules.ignore_punctuation) {
         // Remove common punctuation: . , ! ? " ' -
-        normalized = normalized.replace(/[.,!?"'–—\-]/g, '');
+        normalized = normalized.replace(/[.,!?"'«»–—-]/g, '').replace(/\s+/g, ' ').trim();
     }
 
     if (rules.ignore_stress_marks) {
         // Remove combining acute accent (U+0301)
-        normalized = normalized.normalize("NFD").replace(/[\u0301]/g, "");
+        normalized = normalized.normalize("NFD").replace(/\u0301/g, "").normalize("NFC");
     }
 
     if (rules.accept_ё_as_е) {

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Volume2, Loader2 } from "lucide-react";
 import { playText } from "@/lib/audio";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store";
 
 interface AudioPlayerProps {
     text: string;
@@ -11,7 +12,7 @@ interface AudioPlayerProps {
     iconClassName?: string;
     size?: "sm" | "icon" | "default" | "lg";
     variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
-    autoPlay?: boolean;
+    lang?: string; // Defaults to Russian
     disabled?: boolean;
 }
 
@@ -22,13 +23,11 @@ export function AudioPlayer({
     iconClassName,
     size = "icon",
     variant = "ghost",
-    autoPlay,
+    lang,
     disabled
 }: AudioPlayerProps) {
     const [isPlaying, setIsPlaying] = useState(false);
-
-    // TODO: Implement autoPlay logic (needs to be careful about overlapping audio if multiple mount)
-    // For now, let the parent handle autoPlay via useEffect calling playText directly if needed.
+    const enabled = useAppStore((s) => s.audioSettings.enabled);
 
     const handlePlay = async (e?: React.MouseEvent) => {
         if (e) e.stopPropagation(); // Prevent card clicks
@@ -38,6 +37,7 @@ export function AudioPlayer({
         try {
             await playText(text, {
                 speed,
+                lang,
                 onEnd: () => setIsPlaying(false),
                 onError: () => setIsPlaying(false)
             });
@@ -46,6 +46,8 @@ export function AudioPlayer({
             setIsPlaying(false);
         }
     };
+
+    if (!enabled) return null;
 
     return (
         <Button
@@ -60,7 +62,8 @@ export function AudioPlayer({
             )}
             onClick={handlePlay}
             disabled={disabled || isPlaying || !text}
-            title="Play Audio"
+            title="Play audio"
+            aria-label="Play audio"
             type="button"
         >
             {isPlaying ? (

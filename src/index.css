@@ -186,3 +186,15 @@
         font-style: normal !important;
     }
 }
+/* Respect the home indicator / notch on mobile and installed PWAs */
+@utility pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+    padding-top: env(safe-area-inset-top);
+}
+
+@utility animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

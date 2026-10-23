@@ -66,7 +66,7 @@ function InteractiveWord({ word, fullContext, apiKey }: { word: string, fullCont
         try {
             const result = await translateWord(apiKey, word, fullContext);
             setTranslation(result);
-        } catch (error) {
+        } catch {
             setTranslation("Error");
         } finally {
             setIsLoading(false);

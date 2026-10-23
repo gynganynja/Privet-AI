@@ -3,8 +3,10 @@ import { type ChatMessage } from "./openai";
 // ... (imports remain)
 export interface LessonRequest {
   topic: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  mode?: 'standard' | 'story';
+  level: string;
+  mode?: 'standard' | 'scenario';
+  // Why the learner is studying (e.g. "Travel"), used to pick examples and dialogue settings.
+  goal?: string;
 }
 
 export const generateStructuredLessonPrompt = (request: LessonRequest): ChatMessage[] => {
@@ -34,6 +36,9 @@ NON-NEGOTIABLE RULES
 6) Curriculum gating:
    - Never introduce vocab/grammar/letters in Drill/Recall/Use that weren’t introduced in Teach (this lesson) or previously unlocked.
    - If alphabet-limited stage, never ask learners to type RU words containing letters not yet taught.
+7) Volume: 3–7 teach cards, 6–8 drill questions (each with an explanation), 4–6 recall items.
+8) Grammar: include exactly one \`grammar\` point with 3 minimal pairs that differ by one element. For pure alphabet lessons, use it to contrast similar-looking letters instead.
+9) Every teach card has a short \`example_ru\` sentence (max 7 words, only taught/known words) with \`example_en\`.
 
 PATH VARIETY REQUIREMENT (NOT STORIES)
 - Lessons can be one of two internal flavors:
@@ -45,7 +50,8 @@ PATH VARIETY REQUIREMENT (NOT STORIES)
 INPUTS:
 - Topic: "${request.topic}"
 - Level: "${request.level}"
-- Flavor: "${mode === 'story' ? 'scenario' : 'standard'}"
+- Flavor: "${mode}"
+- Learner goal: "${request.goal || 'general'}" (choose example sentences and dialogue settings that suit this goal, without adding extra vocabulary)
 
 OUTPUT FORMAT:
 Return ONLY a valid JSON object with this structure:
@@ -70,9 +76,18 @@ Return ONLY a valid JSON object with this structure:
       "translit_visible_default": true,
       "pronunciation_hint":"pree-VYET",
       "audio_text_ru":"привет",
-      "notes":"Informal greeting"
+      "notes":"Informal greeting for friends and family",
+      "example_ru":"Привет, мама!",
+      "example_en":"Hi, Mum!"
     }
   ],
+  "grammar": {
+    "title": "Formal vs informal",
+    "explanation_md": "Short markdown explanation of the ONE grammar point (max 80 words).",
+    "minimal_pairs": [
+      { "base": "Привет, Анна!", "contrast": "Здравствуйте, Анна Ивановна!", "explanation": "Friend vs teacher: informal vs formal greeting." }
+    ]
+  },
   "drill": [ 
     {
         "type": "selection",

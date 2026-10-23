@@ -4,15 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic } from "lucide-react";
 import { FeedbackSheet } from "@/components/FeedbackSheet";
 import { useAppStore } from "@/store";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { explainError } from "@/lib/openai";
-import { validateInput } from "@/lib/answerValidation";
+import { normalizeText, validateInput } from "@/lib/answerValidation";
 
-export function RecallView({ module, onComplete }: { module: DrillModule; onComplete?: () => void }) {
-    const { apiKey } = useAppStore();
+// Same leniency as answer keys: ignore case, punctuation, stress marks and ё/е.
+const LENIENT = { ignore_punctuation: true, ignore_stress_marks: true, accept_ё_as_е: true };
+
+export function RecallView({ module, onComplete, onResult }: {
+    module: DrillModule;
+    onComplete?: () => void;
+    onResult?: (isCorrect: boolean) => void;
+}) {
+    const { apiKey, logError } = useAppStore();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [inputAnswer, setInputAnswer] = useState("");
 
@@ -39,8 +46,8 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
         let correctAnswerText = "";
         let validationFeedback: string | undefined;
 
-        if (question.type === 'input' || (question as any).type === 'recall_translate') {
-            const q = question as any;
+        if (question.type === 'input') {
+            const q = question;
             correctAnswerText = q.correctAnswer || (q.answer_key?.accepted_answers_base?.[0] || "");
 
             if (q.answer_key) {
@@ -48,7 +55,7 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
                 isCorrect = validation.isCorrect;
                 validationFeedback = validation.feedback;
             } else {
-                isCorrect = inputAnswer.trim().toLowerCase() === correctAnswerText.toLowerCase();
+                isCorrect = normalizeText(inputAnswer, LENIENT) === normalizeText(correctAnswerText, LENIENT);
             }
         } else if (question.type === 'cloze') {
             correctAnswerText = question.correctAnswer || "";
@@ -56,6 +63,15 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
         } else if (question.type === 'transformation') {
             correctAnswerText = question.transformed || "";
             isCorrect = inputAnswer.trim().toLowerCase() === correctAnswerText.toLowerCase();
+        }
+
+        onResult?.(isCorrect);
+        if (!isCorrect) {
+            logError('recall_translation', {
+                prompt: 'prompt' in question ? question.prompt : 'Recall',
+                error: inputAnswer,
+                correct: correctAnswerText,
+            });
         }
 
         const description = isCorrect
@@ -78,8 +94,7 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
         if (question.type === 'input') qText = question.prompt;
         else if (question.type === 'cloze') qText = question.question;
         else if (question.type === 'transformation') qText = question.instruction;
-        else if ('question' in question) qText = (question as any).question;
-        else if ('prompt' in question) qText = (question as any).prompt;
+        else if ('question' in question) qText = question.question;
 
         const correct = feedback.correctAnswer || "";
 
@@ -104,17 +119,22 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
                 <h3 className="text-xl font-bold">Translate to Russian</h3>
             </div>
 
-            <Card className="border-0 shadow-lg bg-white overflow-hidden">
+            <Card className="border-0 shadow-lg overflow-hidden">
                 <CardContent className="p-8 space-y-8">
                     {/* Prompt */}
                     <div className="text-center space-y-4">
                         {(question.type === 'input') && (
-                            <h2 className="text-2xl font-medium text-foreground">
-                                {question.prompt || (question as any).question || "Translate"}
-                            </h2>
+                            <>
+                                <h2 className="text-2xl font-medium text-foreground">
+                                    {question.prompt || "Translate"}
+                                </h2>
+                                {question.textToDisplay && question.textToDisplay !== question.prompt && (
+                                    <p className="text-sm text-muted-foreground">{question.textToDisplay}</p>
+                                )}
+                            </>
                         )}
-                        {/* Audio Hint Button */}
-                        <div className="flex justify-center">
+                        {/* Audio hint: plays the answer, for when the learner is stuck */}
+                        {question.audio_text_ru && <div className="flex justify-center">
                             <AudioPlayer
                                 text={question.audio_text_ru || ""}
                                 disabled={!question.audio_text_ru}
@@ -123,7 +143,7 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
                                 className="rounded-full bg-primary/5 text-primary h-12 w-12"
                                 iconClassName="h-6 w-6"
                             />
-                        </div>
+                        </div>}
                     </div>
 
                     {/* Input Area */}
@@ -133,13 +153,16 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
                             onChange={(e) => setInputAnswer(e.target.value)}
                             placeholder="Type in Russian..."
                             className="bg-muted/30 border-0 border-b-2 border-input rounded-none px-4 py-8 text-xl text-center focus-visible:ring-0 focus-visible:border-primary"
-                            onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
+                            onKeyDown={(e) => e.key === 'Enter' && !feedback.isOpen && handleCheck()}
+                            disabled={feedback.isOpen}
+                            lang="ru"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
                             autoFocus
                         />
                         <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
-                                <Mic size={20} />
-                            </Button>
+                            <AudioRecorder onTranscriptionComplete={setInputAnswer} disabled={feedback.isOpen} />
                         </div>
                     </div>
                 </CardContent>
@@ -149,14 +172,14 @@ export function RecallView({ module, onComplete }: { module: DrillModule; onComp
                 onClick={handleCheck}
                 className="w-full h-14 text-lg"
                 size="lg"
-                disabled={!inputAnswer.trim()}
+                disabled={!inputAnswer.trim() || feedback.isOpen}
             >
                 Check Answer
             </Button>
 
             <FeedbackSheet
                 isOpen={feedback.isOpen}
-                type={feedback.type as any}
+                type={feedback.type ?? "info"}
                 title={feedback.title}
                 description={feedback.description}
                 correctAnswer={feedback.correctAnswer}

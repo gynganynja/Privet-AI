@@ -147,7 +147,7 @@ export interface LessonV2 {
     drill: DrillExercise[];
     recall: RecallCard[];
     use: (DialogueModule | DrillExercise)[]; // Use section can contain dialogue or complex drills
-    review: any;
+    review: unknown;
 }
 
 export interface AnswerKey {

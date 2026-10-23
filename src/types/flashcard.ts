@@ -13,7 +13,8 @@ export interface FlashcardData {
     pronunciation_hint?: string; // e.g. "za-VOOT" (Spoken cue)
     transliteration?: string; // DEPRECATED: Legacy field (keep for backward compat)
 
-    context: string;
+    notes?: string; // Short usage note in English
+    context: string; // Example sentence in Russian
     contextEnglish?: string;
 
     // Audio Metadata (v1.1 Guidelines)

@@ -118,14 +118,15 @@ export const playText = async (
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Select Voice
-    if (options.voiceURI) {
-        const voices = window.speechSynthesis.getVoices();
-        const selected = voices.find(v => v.voiceURI === options.voiceURI);
-        if (selected) utterance.voice = selected;
+    // Select voice: an explicit one, else the saved preference (a Russian voice, so only for Russian text)
+    const targetLang = options.lang || 'ru';
+    const preferredURI = options.voiceURI ?? (targetLang === 'ru' ? audioSettings.voiceURI : null);
+    const preferred = preferredURI ? window.speechSynthesis.getVoices().find(v => v.voiceURI === preferredURI) : undefined;
+    utterance.lang = targetLang === 'ru' ? 'ru-RU' : targetLang;
+    if (preferred) {
+        utterance.voice = preferred;
     } else {
-        // Auto-select based on requested lang (default to RU)
-        const targetLang = options.lang || 'ru';
+        // Auto-select based on requested lang
         const voices = window.speechSynthesis.getVoices();
         // Try to find a voice that matches the lang
         // Prefer "Google" voices if available on Chrome as they are often better quality

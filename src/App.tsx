@@ -10,12 +10,8 @@ import ProfilePage from './pages/Profile'
 import LessonsPage from './pages/Lessons'
 import SettingsPage from './pages/Settings'
 import OnboardingPage from './pages/Onboarding'
+import RoleplayPage from './pages/Roleplay'
 import { useAppStore } from "./store";
-
-// Legacy/Placeholder placeholder (can be removed later once files are deleted)
-// import ChatPage from './pages/Chat'
-// import FlashcardsPage from './pages/Flashcards'
-// import RoleplayPage from './pages/Roleplay'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -34,16 +30,18 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-8 text-center text-red-500">
-          <h1>Something went wrong.</h1>
-          <pre className="mt-4 bg-gray-100 p-4 rounded text-left overflow-auto max-w-2xl mx-auto text-sm text-black">
-            {this.state.error?.message}
-            <br />
-            {this.state.error?.stack}
-          </pre>
-          <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded" onClick={() => window.location.reload()}>
-            Reload Page
-          </button>
+        <div className="min-h-dvh flex items-center justify-center p-6">
+          <div className="max-w-md w-full space-y-4 text-center">
+            <h1 className="text-2xl font-bold">Something went wrong</h1>
+            <p className="text-muted-foreground">Your progress is saved. Reloading usually fixes this.</p>
+            <details className="text-left text-xs bg-muted p-3 rounded">
+              <summary className="cursor-pointer">Error details</summary>
+              <pre className="mt-2 whitespace-pre-wrap overflow-auto max-h-60">{this.state.error?.message}</pre>
+            </details>
+            <button className="px-4 py-2 rounded-md bg-primary text-primary-foreground" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </div>
         </div>
       );
     }
@@ -54,8 +52,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 // Protected Route Wrapper
 const RequireOnboarding = () => {
-  const { userProgress } = useAppStore();
-  return userProgress.isOnboarded ? <Outlet /> : <Navigate to="/onboarding" replace />;
+  const isOnboarded = useAppStore((s) => s.userProgress.isOnboarded);
+  return isOnboarded ? <Outlet /> : <Navigate to="/onboarding" replace />;
 };
 
 function App() {
@@ -73,14 +71,14 @@ function App() {
               <Route path="/practice" element={<PracticePage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
-              {/* Modal/Detail Routes - Typically these might overlay or be separate pages */}
+              <Route path="/lessons" element={<LessonsPage />} />
               <Route path="/lessons/:id" element={<LessonsPage />} />
+              <Route path="/roleplay" element={<RoleplayPage />} />
               <Route path="/settings" element={<SettingsPage />} />
 
-              {/* Legacy redirect for safety */}
-              <Route path="/chat" element={<Navigate to="/practice" replace />} />
+              {/* Old URLs */}
+              <Route path="/chat" element={<Navigate to="/roleplay" replace />} />
               <Route path="/flashcards" element={<Navigate to="/practice" replace />} />
-              <Route path="/roleplay" element={<Navigate to="/practice" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

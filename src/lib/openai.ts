@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { CHAT_MODEL, TTS_MODEL, TRANSCRIBE_MODEL } from '@/config';
 
 // This function will be used to get the client with the user's API key
 export const getOpenAIClient = (apiKey: string) => {
@@ -13,15 +14,16 @@ export interface ChatMessage {
     content: string;
 }
 
-export const generateResponse = async (apiKey: string, messages: ChatMessage[]) => {
+export const generateResponse = async (apiKey: string, messages: ChatMessage[], options: { json?: boolean } = {}) => {
     if (!apiKey) throw new Error("API Key is required");
 
     const client = getOpenAIClient(apiKey);
 
     try {
         const response = await client.chat.completions.create({
-            model: "gpt-3.5-turbo", // or gpt-4o, configurable later
+            model: CHAT_MODEL,
             messages: messages,
+            ...(options.json && { response_format: { type: "json_object" as const } }),
         });
         return response.choices[0].message;
     } catch (error) {
@@ -37,7 +39,7 @@ export const translateWord = async (apiKey: string, word: string, context: strin
 
     try {
         const response = await client.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: CHAT_MODEL,
             messages: [
                 {
                     role: "system",
@@ -69,7 +71,7 @@ export const generateSpeech = async (
 
     try {
         const mp3 = await client.audio.speech.create({
-            model: "tts-1",
+            model: TTS_MODEL,
             voice: voice,
             input: input,
             speed: speed,
@@ -94,7 +96,7 @@ export const transcribeAudio = async (apiKey: string, audioBlob: Blob, language:
     try {
         const transcription = await client.audio.transcriptions.create({
             file: file,
-            model: "whisper-1",
+            model: TRANSCRIBE_MODEL,
             language: language,
             prompt: "Russian language exercise answer.", // Updated prompt to be more relevant
         });
@@ -145,26 +147,24 @@ export const validateAnswer = async (apiKey: string, prompt: string, userAnswer:
 
     try {
         const response = await client.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: CHAT_MODEL,
             messages: [
                 {
                     role: "system",
-                    content: `You are a lenient and encouraging Russian language tutor. Your goal is to keep the student motivated. 
-                    Compare the Student's Answer to the Correct Answer based on the Prompt.
-                    
-                    Respond with a JSON object:
-                    {
-                        "isCorrect": boolean, // True if the meaning is basically correct, even with minor spelling errors or small grammar slips.
-                        "isClose": boolean, // True if the meaning is mostly there but there's a significant error (like wrong word) or it's slightly messy.
-                        "feedback": string // A short, encouraging message (max 12 words). Praise them if they are close!
-                    }
+                    content: `You are an encouraging but accurate Russian tutor checking a learner's answer.
+Compare the Student Answer to the Correct Answer for the given Prompt.
 
-                    Rules for Leniency:
-                    - **Prioritize Meaning**: If they communicated the right idea, be generous.
-                    - **Ignore Minor Slips**: A missing letter, a slightly wrong case ending, or a typo shouldn't necessarily fail them.
-                    - **Communication First**: If you understand what they meant and it's 90% there, mark 'isCorrect: true'.
-                    - **Feedback**: Be specific but kind. If they made a mistake, suggest the correction gently.
-                    - **Wrong Language**: Still mark as Incorrect if they answer in the wrong language, but explain kindly.`
+Respond with a JSON object:
+{
+    "isCorrect": boolean, // The answer is right: same meaning AND correct grammar (case endings, gender, verb form).
+    "isClose": boolean,   // Not correct, but nearly: the right words with one grammar slip or a real spelling mistake.
+    "feedback": string    // Max 15 words. Kind and specific; when wrong, name the exact fix.
+}
+
+Rules:
+- Never penalise: capitalisation, punctuation, missing stress marks, е instead of ё, or a different but equally natural word order or synonym.
+- Do penalise: wrong case endings, wrong gender agreement, wrong verb aspect/person, or a different meaning. These are what the learner is here to practise, so mark them isCorrect: false (isClose: true if everything else is right).
+- An answer in the wrong language is incorrect; explain kindly.`
                 },
                 {
                     role: "user",
@@ -198,7 +198,7 @@ export const explainError = async (apiKey: string, question: string, userAnswer:
 
     try {
         const response = await client.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: CHAT_MODEL,
             messages: [
                 {
                     role: "system",

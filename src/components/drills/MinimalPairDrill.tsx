@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Volume2, CheckCircle2, XCircle, Ear } from "lucide-react";
+import { Volume2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { playText } from "@/lib/audio";
 import { useAppStore } from "@/store";

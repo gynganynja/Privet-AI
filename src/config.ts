@@ -1,4 +1,10 @@
-// ⚠️ SECURITY WARNING: 
-// Embedding your API key here means it will be visible to anyone who decompiles your app.
-// Only do this for personal use or internally distributed apps.
-export const EMBEDDED_API_KEY = "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"; // Replace with your OpenAI API Key
+// Shared app configuration.
+//
+// Never embed an OpenAI API key here: this app is a static site, so anything in
+// the bundle is public. Each learner enters their own key in Settings, and it
+// stays in that browser's local storage.
+
+// Model used for lesson generation, chat, answer checking and explanations.
+export const CHAT_MODEL = "gpt-4o-mini";
+export const TTS_MODEL = "tts-1";
+export const TRANSCRIBE_MODEL = "whisper-1";

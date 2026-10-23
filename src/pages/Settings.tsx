@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAppStore } from "@/store";
+import { useAppStore, type OpenAIVoice } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="max-w-2xl mx-auto w-full space-y-6">
+        <div className="max-w-2xl mx-auto w-full space-y-6 p-4 sm:p-6">
             <h1 className="text-3xl font-bold">Settings</h1>
 
             <Card>
@@ -33,7 +33,8 @@ export default function SettingsPage() {
                         OpenAI API Key
                     </CardTitle>
                     <CardDescription>
-                        Your API key is stored locally on this device and is never sent to any other server.
+                        Lessons, answer checking, voice input and premium voices use your own OpenAI key. It's stored only in
+                        this browser and sent only to OpenAI. Set a monthly spending limit in your OpenAI account to stay in control.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -41,6 +42,7 @@ export default function SettingsPage() {
                         <div className="relative flex-1">
                             <Input
                                 type={showKey ? "text" : "password"}
+                                autoComplete="off"
                                 placeholder="sk-..."
                                 value={localKey}
                                 onChange={(e) => setLocalKey(e.target.value)}
@@ -50,12 +52,13 @@ export default function SettingsPage() {
                                 size="icon"
                                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                                 onClick={() => setShowKey(!showKey)}
+                                aria-label={showKey ? "Hide key" : "Show key"}
                             >
                                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
                         </div>
-                        <Button onClick={handleSave} disabled={!localKey || localKey === apiKey}>
-                            {isSaved ? "Saved!" : "Save Key"}
+                        <Button onClick={handleSave} disabled={localKey.trim() === apiKey}>
+                            {isSaved ? "Saved!" : localKey.trim() || !apiKey ? "Save key" : "Remove key"}
                         </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -173,7 +176,7 @@ function AudioSettingsSection() {
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                     value={audioSettings.openaiVoice || 'alloy'}
                                     onChange={(e) => {
-                                        const voice = e.target.value as any;
+                                        const voice = e.target.value as OpenAIVoice;
                                         setAudioSettings({ openaiVoice: voice });
                                         playText("Привет, это голос " + voice, { voiceURI: null });
                                     }}
@@ -193,25 +196,25 @@ function AudioSettingsSection() {
                         <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
                             <label className="text-sm font-medium">Playback Speed</label>
 
-                            <div className="flex items-center gap-4">
+                            <div className="grid grid-cols-3 gap-2">
                                 <Button
                                     variant={audioSettings.speed === 0.75 ? "default" : "outline"}
                                     onClick={() => setAudioSettings({ speed: 0.75 })}
-                                    className="flex-1"
+                                    
                                 >
                                     Slow (0.75x)
                                 </Button>
                                 <Button
                                     variant={audioSettings.speed === 1.0 ? "default" : "outline"}
                                     onClick={() => setAudioSettings({ speed: 1.0 })}
-                                    className="flex-1"
+                                    
                                 >
                                     Normal (1.0x)
                                 </Button>
                                 <Button
                                     variant={audioSettings.speed === 1.25 ? "default" : "outline"}
                                     onClick={() => setAudioSettings({ speed: 1.25 })}
-                                    className="flex-1"
+                                    
                                 >
                                     Fast (1.25x)
                                 </Button>
@@ -236,14 +239,29 @@ function AudioSettingsSection() {
                         {/* Auto-play Toggle */}
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <label className="text-sm font-medium">Auto-play Narration</label>
-                                <p className="text-xs text-muted-foreground">Automatically play audio during lessons.</p>
+                                <label className="text-sm font-medium">Auto-play audio</label>
+                                <p className="text-xs text-muted-foreground">Play Russian prompts automatically during lessons.</p>
                             </div>
                             <input
                                 type="checkbox"
                                 className="h-4 w-4 accent-primary"
                                 checked={audioSettings.autoPlay}
                                 onChange={(e) => setAudioSettings({ autoPlay: e.target.checked })}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <label htmlFor="narration" className="text-sm font-medium">Teacher narration</label>
+                                <p className="text-xs text-muted-foreground">With auto-play on, also read the teacher's English guidance aloud.</p>
+                            </div>
+                            <input
+                                id="narration"
+                                type="checkbox"
+                                className="h-4 w-4 accent-primary"
+                                checked={audioSettings.narration}
+                                disabled={!audioSettings.autoPlay}
+                                onChange={(e) => setAudioSettings({ narration: e.target.checked })}
                             />
                         </div>
                     </>

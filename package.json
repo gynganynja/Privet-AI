@@ -1,12 +1,13 @@
 {
-  "name": "russian-learning",
+  "name": "privet-ai",
   "private": true,
   "version": "0.0.0",
   "homepage": "https://gynganynja.github.io/Privet-AI/",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",

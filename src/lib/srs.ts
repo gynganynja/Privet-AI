@@ -83,3 +83,13 @@ export const isDue = (card: { srs?: SRSData }): boolean => {
     if (!card.srs) return true; // New cards are due
     return card.srs.dueDate <= Date.now();
 };
+
+/**
+ * Short label for the interval a rating would schedule, e.g. "1d", "6d", "2mo".
+ */
+export const intervalLabel = (current: SRSData | undefined, rating: ReviewRating): string => {
+    const days = calculateReview(current, rating).interval;
+    if (days < 30) return `${days}d`;
+    if (days < 365) return `${Math.round(days / 30)}mo`;
+    return `${(days / 365).toFixed(1)}y`;
+};

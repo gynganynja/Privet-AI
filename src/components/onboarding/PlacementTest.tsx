@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+
+export type Placement = 'beginner' | 'some' | 'confident';
 
 interface PlacementTestProps {
-    onComplete: (recommendedLevel: string) => void;
+    onComplete: (placement: Placement) => void;
 }
 
 // 10 Progressive Questions (A1 -> A2)
@@ -79,70 +81,36 @@ export function PlacementTest({ onComplete }: PlacementTestProps) {
     const [finished, setFinished] = useState(false);
 
     const currentQ = questions[index];
-    const progress = ((index) / questions.length) * 100;
-
-    const handleAnswer = (option: string) => {
-        const isCorrect = option === currentQ.correct;
-
-        if (isCorrect) {
-            setCorrectCount(prev => prev + 1);
-        } else {
-            setIncorrectCount(prev => prev + 1);
-        }
-
-        // Logic: Stop if 2 mistakes
-        if (!isCorrect && incorrectCount + 1 >= 2) {
-            finishTest(correctCount); // Pass current, not prev, but react state lag...
-            // actually verify with local var for safety
-            return;
-        }
-
-        // Next question
-        if (index < questions.length - 1) {
-            setIndex(prev => prev + 1);
-        } else {
-            finishTest(correctCount + (isCorrect ? 1 : 0));
-        }
-    };
+    const progress = (index / questions.length) * 100;
 
     const finishTest = (finalCorrect: number) => {
         setFinished(true);
-        // Calculate result
-        // 0-3 Correct: Unit 1
-        // 4-7 Correct: Unit 5
-        // 8+ Correct: Unit 10
-        setTimeout(() => {
-            let level = "Unit 1";
-            if (finalCorrect >= 8) level = "Unit 10";
-            else if (finalCorrect >= 4) level = "Unit 5";
-            onComplete(level);
-        }, 1500); // Fake processing delay
+        // 0-3 correct: start at Unit 1; 4-7: skip the alphabet unit; 8+: skip two units.
+        const placement: Placement = finalCorrect >= 8 ? 'confident' : finalCorrect >= 4 ? 'some' : 'beginner';
+        setTimeout(() => onComplete(placement), 1200);
     };
 
-    // If we just triggered finish via early exit in render cycle (due to state update latency pattern above, 
-    // better to handle in effect or just render "Processing..." if finished)
+    const handleAnswer = (option: string) => {
+        const isCorrect = option === currentQ.correct;
+        const correct = correctCount + (isCorrect ? 1 : 0);
+        const incorrect = incorrectCount + (isCorrect ? 0 : 1);
+        setCorrectCount(correct);
+        setIncorrectCount(incorrect);
+
+        // Questions get harder, so two mistakes is enough to place the learner.
+        if (incorrect >= 2 || index === questions.length - 1) {
+            finishTest(correct);
+        } else {
+            setIndex(prev => prev + 1);
+        }
+    };
+
     if (finished) {
         return (
             <div className="text-center space-y-6 animate-in fade-in zoom-in-95 py-12">
                 <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-pulse" />
-                <h2 className="text-2xl font-bold">Analyzing your skills...</h2>
-                <p className="text-muted-foreground">Finding the perfect starting point.</p>
-            </div>
-        );
-    }
-
-    // Early exit UI check
-    if (incorrectCount >= 2) {
-        // Auto-triggering finish in effect would be better, but for now specific UI 
-        // Let's just catch it in the handler
-        return (
-            <div className="text-center space-y-6 animate-in fade-in zoom-in-95 py-12">
-                <XCircle className="h-16 w-16 text-orange-500 mx-auto" />
-                <h2 className="text-2xl font-bold">Let's start from the basics!</h2>
-                <p className="text-muted-foreground">It seems Unit 1 is the best place to build a strong foundation.</p>
-                <Button onClick={() => onComplete("Unit 1")} size="lg" className="mt-4">
-                    Start Unit 1
-                </Button>
+                <h2 className="text-2xl font-bold">Finding your starting point…</h2>
+                <p className="text-muted-foreground">You got {correctCount} right.</p>
             </div>
         );
     }
@@ -165,7 +133,8 @@ export function PlacementTest({ onComplete }: PlacementTestProps) {
                             <Button
                                 key={option}
                                 variant="outline"
-                                className="h-auto py-4 text-lg justify-start px-6 hover:bg-primary/5 hover:border-primary/50 transition-all"
+                                lang="ru"
+                                className="h-auto py-4 text-lg justify-start px-6 whitespace-normal text-left hover:bg-primary/5 hover:border-primary/50 transition-all"
                                 onClick={() => handleAnswer(option)}
                             >
                                 {option}

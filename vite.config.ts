@@ -16,17 +16,19 @@ export default defineConfig({
         name: 'Privet AI - Russian Tutor',
         short_name: 'Privet AI',
         description: 'Your personal AI-powered Russian language tutor.',
-        theme_color: '#ffffff',
+        theme_color: '#0036A7',
+        background_color: '#F5F7FA',
+        display: 'standalone',
         icons: [
           {
             src: 'logo.jpg',
             sizes: '192x192',
-            type: 'image/jpg'
+            type: 'image/jpeg'
           },
           {
             src: 'logo.jpg',
             sizes: '512x512',
-            type: 'image/jpg'
+            type: 'image/jpeg'
           }
         ]
       }
