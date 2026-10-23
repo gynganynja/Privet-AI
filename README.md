@@ -20,10 +20,16 @@ The teaching rules the AI must follow live in `ApplicationRules.md`,
 `LearningGuidelines.md` and `UIDesignGuidelines.md`; the generator prompt is in
 `src/lib/prompts.ts`.
 
-## OpenAI API key
+## AI provider and API keys
 
-The app runs entirely in the browser and calls OpenAI directly with **the learner's own key**,
-entered in onboarding or Settings and stored only in that browser's local storage.
+The app runs entirely in the browser and calls the AI provider directly with **the learner's own
+key**, entered in onboarding or Settings and stored only in that browser's local storage.
+
+- **Claude** (Anthropic, `claude-opus-5-5`) or **OpenAI** (`gpt-4o-mini`) writes lessons, runs
+  roleplay, checks answers and explains mistakes — pick one in Settings. Models are set in
+  `src/config.ts`; all text generation goes through `src/lib/ai.ts`.
+- **Voice answers** (Whisper) and **OpenAI voices** need an OpenAI key, since Claude has no speech
+  APIs. Without one, the mic is hidden and the browser's built-in voices read Russian aloud.
 
 **Never put an API key in the source code.** The site is deployed as static files, so anything
 in the bundle is public.

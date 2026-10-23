@@ -8,12 +8,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageCircle, Library, Trash2, BrainCircuit, Sparkles, Loader2, Wand2, ChevronRight } from "lucide-react";
 import { ReviewMode } from "@/components/ReviewMode";
-import { generateResponse } from "@/lib/openai";
+import { complete, extractJson, useAIReady } from "@/lib/ai";
 import { generateFlashcardsPrompt } from "@/lib/prompts";
 import type { FlashcardData } from "@/types/flashcard";
 
 export default function PracticePage() {
-    const { apiKey, decks, addDeck, deleteDeck, getDueCards } = useAppStore();
+    const { decks, addDeck, deleteDeck, getDueCards } = useAppStore();
+    const aiReady = useAIReady();
 
     const [topic, setTopic] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
@@ -26,8 +27,7 @@ export default function PracticePage() {
         setIsGenerating(true);
         setError(null);
         try {
-            const response = await generateResponse(apiKey, generateFlashcardsPrompt({ topic: title, count: 10 }));
-            const json = (response?.content ?? "").replace(/```json/g, "").replace(/```/g, "").trim();
+            const json = extractJson(await complete(generateFlashcardsPrompt({ topic: title, count: 10 }), { maxTokens: 16000 }));
             const cards = (JSON.parse(json) as FlashcardData[]).filter(c => c.russian && c.english);
             if (cards.length === 0) throw new Error("No cards returned");
             addDeck(title, cards);
@@ -70,17 +70,17 @@ export default function PracticePage() {
                                 placeholder="Generate a deck, e.g. Food & drink"
                                 value={topic}
                                 onChange={(e) => setTopic(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && apiKey && handleGenerateDeck()}
+                                onKeyDown={(e) => e.key === 'Enter' && aiReady && handleGenerateDeck()}
                                 disabled={isGenerating}
                             />
-                            <Button onClick={handleGenerateDeck} disabled={!apiKey || !topic.trim() || isGenerating}>
+                            <Button onClick={handleGenerateDeck} disabled={!aiReady || !topic.trim() || isGenerating}>
                                 {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                                 <span className="ml-2 hidden sm:inline">Generate</span>
                             </Button>
                         </div>
-                        {!apiKey && (
+                        {!aiReady && (
                             <p className="text-xs text-muted-foreground">
-                                Add your OpenAI key in <Link to="/settings" className="underline">Settings</Link> to generate decks.
+                                Add an OpenAI or Claude key in <Link to="/settings" className="underline">Settings</Link> to generate decks.
                             </p>
                         )}
                         {error && (

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useAppStore } from "@/store";
-import { translateWord } from "@/lib/openai";
+import { translateWord, useAIReady } from "@/lib/ai";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,7 +16,7 @@ interface InteractiveTextProps {
 }
 
 export default function InteractiveText({ content, role }: InteractiveTextProps) {
-    const { apiKey } = useAppStore();
+    const aiReady = useAIReady();
 
     // Only make assistant text interactive to save tokens and focus on learning
     if (role !== "assistant") {
@@ -46,7 +45,7 @@ export default function InteractiveText({ content, role }: InteractiveTextProps)
                         key={index}
                         word={word}
                         fullContext={content}
-                        apiKey={apiKey || ""}
+                        aiReady={aiReady}
                     />
                 );
             })}
@@ -54,17 +53,21 @@ export default function InteractiveText({ content, role }: InteractiveTextProps)
     );
 }
 
-function InteractiveWord({ word, fullContext, apiKey }: { word: string, fullContext: string, apiKey: string }) {
+function InteractiveWord({ word, fullContext, aiReady }: { word: string, fullContext: string, aiReady: boolean }) {
     const [translation, setTranslation] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
     const handleTranslate = async () => {
         if (translation || isLoading) return; // Already fetched
+        if (!aiReady) {
+            setTranslation("Add an AI key in Settings to translate words.");
+            return;
+        }
 
         setIsLoading(true);
         try {
-            const result = await translateWord(apiKey, word, fullContext);
+            const result = await translateWord(word, fullContext);
             setTranslation(result);
         } catch {
             setTranslation("Error");

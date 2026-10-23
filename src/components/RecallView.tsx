@@ -8,7 +8,7 @@ import { FeedbackSheet } from "@/components/FeedbackSheet";
 import { useAppStore } from "@/store";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { AudioRecorder } from "@/components/AudioRecorder";
-import { explainError } from "@/lib/openai";
+import { explainError, useAIReady } from "@/lib/ai";
 import { normalizeText, validateInput } from "@/lib/answerValidation";
 
 // Same leniency as answer keys: ignore case, punctuation, stress marks and ё/е.
@@ -19,7 +19,8 @@ export function RecallView({ module, onComplete, onResult }: {
     onComplete?: () => void;
     onResult?: (isCorrect: boolean) => void;
 }) {
-    const { apiKey, logError } = useAppStore();
+    const { logError } = useAppStore();
+    const aiReady = useAIReady();
     const [currentIndex, setCurrentIndex] = useState(0);
     const [inputAnswer, setInputAnswer] = useState("");
 
@@ -88,7 +89,7 @@ export function RecallView({ module, onComplete, onResult }: {
     };
 
     const handleExplain = async () => {
-        if (!apiKey || !question) return null;
+        if (!aiReady || !question) return null;
 
         let qText = "Translation exercise";
         if (question.type === 'input') qText = question.prompt;
@@ -98,7 +99,7 @@ export function RecallView({ module, onComplete, onResult }: {
 
         const correct = feedback.correctAnswer || "";
 
-        return await explainError(apiKey, qText || "Question", inputAnswer, correct);
+        return await explainError(qText || "Question", inputAnswer, correct);
     };
 
     const handleNext = () => {

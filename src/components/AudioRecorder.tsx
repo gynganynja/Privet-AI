@@ -142,6 +142,9 @@ export function AudioRecorder({ onTranscriptionComplete, className, disabled, la
         }
     };
 
+    // Voice input uses OpenAI's Whisper, so it needs an OpenAI key even when Claude writes the lessons.
+    if (!apiKey) return null;
+
     return (
         <div className={cn("flex items-center gap-2", className)}>
             {!isRecording ? (
@@ -151,6 +154,8 @@ export function AudioRecorder({ onTranscriptionComplete, className, disabled, la
                     size="icon"
                     onClick={startRecording}
                     disabled={disabled || isTranscribing}
+                    aria-label="Answer by voice"
+                    title="Answer by voice"
                     className={cn(isTranscribing ? "animate-pulse" : "")}
                 >
                     {isTranscribing ? (

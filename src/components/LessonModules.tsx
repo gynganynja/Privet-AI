@@ -14,7 +14,7 @@ import { AudioRecorder } from "@/components/AudioRecorder";
 import { ClozeDrill } from "@/components/drills/ClozeDrill";
 import { TransformationDrill } from "@/components/drills/TransformationDrill";
 import { MinimalPairDrill } from "@/components/drills/MinimalPairDrill";
-import { explainError, validateAnswer } from "@/lib/openai";
+import { explainError, validateAnswer, useAIReady } from "@/lib/ai";
 import { normalizeText, validateInput } from "@/lib/answerValidation";
 
 // --- Helper Hook ---
@@ -174,7 +174,8 @@ export function DrillView({ module, onComplete, onResult }: {
     const [isExplaining, setIsExplaining] = useState(false);
 
     // Phase 2: Error Logging
-    const { logError, audioSettings, apiKey } = useAppStore();
+    const { logError, audioSettings } = useAppStore();
+    const aiReady = useAIReady();
     const playAudio = useLessonAudio();
 
     const shuffledCache = useRef<Map<number, { options: string[], correctIndex: number }>>(new Map());
@@ -331,9 +332,9 @@ export function DrillView({ module, onComplete, onResult }: {
         let result = { ...local, feedback: local.feedback || (local.isCorrect ? "Correct!" : "Incorrect.") };
 
         // 2. If the key says no, let the AI judge valid alternatives (synonyms, word order)
-        if (!local.isCorrect && apiKey) {
+        if (!local.isCorrect && aiReady) {
             try {
-                result = await validateAnswer(apiKey, question.prompt, inputAnswer, question.correctAnswer);
+                result = await validateAnswer(question.prompt, inputAnswer, question.correctAnswer);
             } catch (error) {
                 console.error("Validation failed", error);
             }
@@ -357,13 +358,13 @@ export function DrillView({ module, onComplete, onResult }: {
     };
 
     const handleExplain = async () => {
-        if (!apiKey) return;
+        if (!aiReady) return;
         setIsExplaining(true);
         try {
             const result = question.type === 'selection'
-                ? await explainError(apiKey, question.question, currentOptions[selectedOption ?? 0], currentOptions[currentCorrectIndex] ?? "")
+                ? await explainError(question.question, currentOptions[selectedOption ?? 0], currentOptions[currentCorrectIndex] ?? "")
                 : question.type === 'input'
-                    ? await explainError(apiKey, question.prompt || "Question", inputAnswer, question.correctAnswer || "")
+                    ? await explainError(question.prompt || "Question", inputAnswer, question.correctAnswer || "")
                     : null;
             setAiExplanation(result);
         } catch {
@@ -468,7 +469,7 @@ export function DrillView({ module, onComplete, onResult }: {
                                     />
                                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                         {/* Indicator for Smart Validation */}
-                                        {apiKey && (
+                                        {aiReady && (
                                             <div title="AI Smart Validation Active" className="h-2 w-2 rounded-full bg-green-500/50 animate-pulse" />
                                         )}
                                         <AudioRecorder
@@ -483,7 +484,7 @@ export function DrillView({ module, onComplete, onResult }: {
                                         {isValidating ? "Checking..." : "Check Answer"}
                                     </Button>
                                 )}
-                                {!apiKey && !isSubmitted && (
+                                {!aiReady && !isSubmitted && (
                                     <p className="text-[10px] text-center text-muted-foreground opacity-50">
                                         Basic check only. Set API Key for smart feedback.
                                     </p>
@@ -574,7 +575,7 @@ export function DrillView({ module, onComplete, onResult }: {
                                     )}
 
                                     {/* AI Explanation Button / Result */}
-                                    {!validationResult.isCorrect && apiKey && (
+                                    {!validationResult.isCorrect && aiReady && (
                                         <div className="pt-2">
                                             {aiExplanation ? (
                                                 <div className="p-3 bg-white/50 rounded-lg border border-black/5 animate-in fade-in">

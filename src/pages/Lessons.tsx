@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { generateResponse } from "@/lib/openai";
+import { complete, useAIReady } from "@/lib/ai";
 import { generateStructuredLessonPrompt } from "@/lib/prompts";
 import { parseLessonResponse, lessonVocabulary } from "@/lib/lessonParser";
 import { VocabularyView, GrammarView, DrillView, DialogueView } from "@/components/LessonModules";
@@ -30,22 +30,22 @@ export default function LessonsPage() {
     return <CourseLesson key={node.id} node={node} />;
 }
 
-async function generateLesson(apiKey: string, topic: string, options: { level: string; mode: 'standard' | 'scenario'; goal?: string; focusPoints?: string[] }) {
+async function generateLesson(topic: string, options: { level: string; mode: 'standard' | 'scenario'; goal?: string; focusPoints?: string[] }) {
     const messages = generateStructuredLessonPrompt({
         topic: options.focusPoints?.length ? `${topic}. Focus strictly on: ${options.focusPoints.join("; ")}` : topic,
         level: options.level,
         mode: options.mode,
         goal: options.goal,
     });
-    const response = await generateResponse(apiKey, messages, { json: true });
-    if (!response?.content) throw new Error("No response from the AI.");
-    return parseLessonResponse(response.content);
+    const content = await complete(messages, { json: true, maxTokens: 32000, effort: "medium" });
+    if (!content) throw new Error("No response from the AI.");
+    return parseLessonResponse(content);
 }
 
 const errorMessage = (err: unknown) => {
     const status = (err as { status?: number })?.status;
-    if (status === 401) return "Your OpenAI API key was rejected. Check it in Settings.";
-    if (status === 429) return "OpenAI says you're over your rate limit or quota. Wait a moment, or check your OpenAI billing.";
+    if (status === 401) return "Your API key was rejected. Check it in Settings.";
+    if (status === 429) return "You're over your rate limit or credit balance. Wait a moment, or check billing in your OpenAI or Anthropic account.";
     if (err instanceof SyntaxError) return "The AI returned a lesson we couldn't read. Please try again.";
     return err instanceof Error ? err.message : "Something went wrong.";
 };
@@ -54,7 +54,8 @@ const errorMessage = (err: unknown) => {
 
 function CourseLesson({ node }: { node: LessonNode }) {
     const navigate = useNavigate();
-    const { apiKey, userProgress, nodeLessons, cacheNodeLesson, clearNodeLesson } = useAppStore();
+    const { userProgress, nodeLessons, cacheNodeLesson, clearNodeLesson } = useAppStore();
+    const aiReady = useAIReady();
     const cached = nodeLessons[node.id];
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +67,7 @@ function CourseLesson({ node }: { node: LessonNode }) {
         setIsLoading(true);
         setError(null);
         try {
-            const lesson = await generateLesson(apiKey, node.content.topic, {
+            const lesson = await generateLesson(node.content.topic, {
                 level: node.content.level,
                 // Every third lesson leans on dialogue, per the curriculum's variety target.
                 mode: node.type === 'lesson' && Number(node.id.slice(-1)) % 3 === 0 ? 'scenario' : 'standard',
@@ -80,13 +81,13 @@ function CourseLesson({ node }: { node: LessonNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [apiKey, node, userProgress.userGoal, cacheNodeLesson]);
+    }, [node, userProgress.userGoal, cacheNodeLesson]);
 
     useEffect(() => {
-        if (cached || !apiKey || started.current) return;
+        if (cached || !aiReady || started.current) return;
         started.current = true;
         generate();
-    }, [cached, apiKey, generate]);
+    }, [cached, aiReady, generate]);
 
     if (cached) {
         return (
@@ -114,12 +115,12 @@ function CourseLesson({ node }: { node: LessonNode }) {
                 <p className="text-muted-foreground">{node.content.topic}</p>
             </div>
 
-            {!apiKey ? (
+            {!aiReady ? (
                 <Alert>
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>API key needed</AlertTitle>
                     <AlertDescription>
-                        Lessons are written by AI using your OpenAI key. <Link to="/settings" className="underline font-medium">Add it in Settings</Link>.
+                        Lessons are written by AI using your own OpenAI or Claude key. <Link to="/settings" className="underline font-medium">Add it in Settings</Link>.
                     </AlertDescription>
                 </Alert>
             ) : error ? (
@@ -152,7 +153,8 @@ function CourseLesson({ node }: { node: LessonNode }) {
 
 function CustomLessons() {
     const navigate = useNavigate();
-    const { apiKey, userProgress, savedLessons, saveLesson, deleteLesson } = useAppStore();
+    const { userProgress, savedLessons, saveLesson, deleteLesson } = useAppStore();
+    const aiReady = useAIReady();
     const [topic, setTopic] = useState("");
     const [mode, setMode] = useState<'standard' | 'scenario'>('standard');
     const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +166,7 @@ function CustomLessons() {
         setIsLoading(true);
         setError(null);
         try {
-            const lesson = await generateLesson(apiKey, topic.trim(), { level: 'A1', mode, goal: userProgress.userGoal });
+            const lesson = await generateLesson(topic.trim(), { level: 'A1', mode, goal: userProgress.userGoal });
             setActive({ lesson, saved: false });
         } catch (err) {
             console.error("Lesson generation failed", err);
@@ -235,13 +237,13 @@ function CustomLessons() {
                                 value={topic}
                                 onChange={(e) => setTopic(e.target.value)}
                                 disabled={isLoading}
-                                onKeyDown={(e) => e.key === 'Enter' && apiKey && handleGenerate()}
+                                onKeyDown={(e) => e.key === 'Enter' && aiReady && handleGenerate()}
                             />
                         </div>
 
-                        {!apiKey && (
+                        {!aiReady && (
                             <p className="text-sm text-muted-foreground">
-                                <Link to="/settings" className="underline">Add your OpenAI key</Link> to generate lessons.
+                                <Link to="/settings" className="underline">Add an AI key</Link> to generate lessons.
                             </p>
                         )}
 
@@ -252,7 +254,7 @@ function CustomLessons() {
                             </Alert>
                         )}
 
-                        <Button className="w-full" size="lg" onClick={handleGenerate} disabled={!apiKey || isLoading || !topic.trim()}>
+                        <Button className="w-full" size="lg" onClick={handleGenerate} disabled={!aiReady || isLoading || !topic.trim()}>
                             {isLoading ? (
                                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Writing lesson…</>
                             ) : (

@@ -12,6 +12,8 @@ export interface FlashcardDeck {
     createdAt: number;
 }
 
+export type AIProvider = 'openai' | 'anthropic';
+
 export type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 
 export interface UserProgress {
@@ -24,8 +26,13 @@ export interface UserProgress {
 }
 
 interface AppState {
-    apiKey: string;
+    // Which service writes lessons and runs the tutor
+    aiProvider: AIProvider;
+    setAIProvider: (provider: AIProvider) => void;
+    apiKey: string; // OpenAI key (also enables voice input and OpenAI voices)
     setApiKey: (key: string) => void;
+    anthropicKey: string;
+    setAnthropicKey: (key: string) => void;
 
     // Flashcards
     decks: FlashcardDeck[];
@@ -109,8 +116,12 @@ const INITIAL_PROGRESS: UserProgress = {
 export const useAppStore = create<AppState>()(
     persist(
         (set, get) => ({
+            aiProvider: 'openai',
+            setAIProvider: (provider) => set({ aiProvider: provider }),
             apiKey: '',
             setApiKey: (key) => set({ apiKey: key.trim() }),
+            anthropicKey: '',
+            setAnthropicKey: (key) => set({ anthropicKey: key.trim() }),
 
             decks: [],
             addDeck: (title, cards) => {

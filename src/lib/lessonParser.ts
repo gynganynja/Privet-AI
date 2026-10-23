@@ -1,4 +1,5 @@
 import type { FlashcardData } from "@/types/flashcard";
+import { extractJson } from "@/lib/ai";
 import type { DrillExercise, LessonContent, LessonModule } from "@/types/lesson";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- this module adapts loosely-shaped LLM JSON */
@@ -8,8 +9,7 @@ import type { DrillExercise, LessonContent, LessonModule } from "@/types/lesson"
  * shape) into the module list the lesson player renders.
  */
 export function parseLessonResponse(raw: string): LessonContent {
-    const json = raw.replace(/```json/g, "").replace(/```/g, "").trim();
-    const data = JSON.parse(json);
+    const data = JSON.parse(extractJson(raw));
 
     const modules: LessonModule[] = Array.isArray(data.modules) ? data.modules : [];
 

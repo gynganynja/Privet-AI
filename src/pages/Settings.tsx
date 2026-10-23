@@ -1,26 +1,14 @@
 import { useState, useEffect } from "react";
-import { useAppStore, type OpenAIVoice } from "@/store";
+import { useAppStore, type AIProvider, type OpenAIVoice } from "@/store";
+import { CLAUDE_MODEL, OPENAI_CHAT_MODEL } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, KeyRound, Volume2, PlayCircle } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Volume2, PlayCircle, Sparkles } from "lucide-react";
 import { getAvailableVoices, playText, type VoiceOption } from "@/lib/audio";
 
 export default function SettingsPage() {
-    const { apiKey, setApiKey } = useAppStore();
-    const [localKey, setLocalKey] = useState(apiKey);
-    const [showKey, setShowKey] = useState(false);
-    const [isSaved, setIsSaved] = useState(false);
-
-    useEffect(() => {
-        setLocalKey(apiKey);
-    }, [apiKey]);
-
-    const handleSave = () => {
-        setApiKey(localKey);
-        setIsSaved(true);
-        setTimeout(() => setIsSaved(false), 2000);
-    };
+    const { aiProvider, setAIProvider, apiKey, setApiKey, anthropicKey, setAnthropicKey } = useAppStore();
 
     return (
         <div className="max-w-2xl mx-auto w-full space-y-6 p-4 sm:p-6">
@@ -29,45 +17,113 @@ export default function SettingsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <KeyRound className="h-5 w-5" />
-                        OpenAI API Key
+                        <Sparkles className="h-5 w-5" />
+                        AI tutor
                     </CardTitle>
                     <CardDescription>
-                        Lessons, answer checking, voice input and premium voices use your own OpenAI key. It's stored only in
-                        this browser and sent only to OpenAI. Set a monthly spending limit in your OpenAI account to stay in control.
+                        Choose who writes your lessons and runs the tutor. Keys are stored only in this browser and sent only
+                        to that provider. Set a monthly spending limit in your provider account to stay in control.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <Input
-                                type={showKey ? "text" : "password"}
-                                autoComplete="off"
-                                placeholder="sk-..."
-                                value={localKey}
-                                onChange={(e) => setLocalKey(e.target.value)}
-                            />
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                                onClick={() => setShowKey(!showKey)}
-                                aria-label={showKey ? "Hide key" : "Show key"}
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="AI provider">
+                        {PROVIDERS.map((p) => (
+                            <button
+                                key={p.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={aiProvider === p.id}
+                                onClick={() => setAIProvider(p.id)}
+                                className={
+                                    "rounded-lg border-2 p-3 text-left transition-colors " +
+                                    (aiProvider === p.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40")
+                                }
                             >
-                                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                        </div>
-                        <Button onClick={handleSave} disabled={localKey.trim() === apiKey}>
-                            {isSaved ? "Saved!" : localKey.trim() || !apiKey ? "Save key" : "Remove key"}
-                        </Button>
+                                <p className="font-semibold">{p.name}</p>
+                                <p className="text-xs text-muted-foreground">{p.model}</p>
+                            </button>
+                        ))}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        You can get an API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline text-primary">platform.openai.com</a>.
-                    </p>
+
+                    <KeyField
+                        label="Claude (Anthropic) API key"
+                        placeholder="sk-ant-..."
+                        value={anthropicKey}
+                        onSave={setAnthropicKey}
+                        help={<>Get one at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noreferrer" className="underline text-primary">platform.claude.com</a>.</>}
+                    />
+                    <KeyField
+                        label="OpenAI API key"
+                        placeholder="sk-..."
+                        value={apiKey}
+                        onSave={setApiKey}
+                        help={<>Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline text-primary">platform.openai.com</a>.
+                            {aiProvider === 'anthropic' && " Optional with Claude: it adds voice answers and OpenAI voices."}</>}
+                    />
                 </CardContent>
             </Card>
 
             <AudioSettingsSection />
+        </div>
+    );
+}
+
+const PROVIDERS: { id: AIProvider; name: string; model: string }[] = [
+    { id: 'anthropic', name: 'Claude', model: CLAUDE_MODEL },
+    { id: 'openai', name: 'OpenAI', model: OPENAI_CHAT_MODEL },
+];
+
+function KeyField({ label, placeholder, value, onSave, help }: {
+    label: string;
+    placeholder: string;
+    value: string;
+    onSave: (key: string) => void;
+    help: React.ReactNode;
+}) {
+    const [localKey, setLocalKey] = useState(value);
+    const [showKey, setShowKey] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
+
+    useEffect(() => {
+        setLocalKey(value);
+    }, [value]);
+
+    const handleSave = () => {
+        onSave(localKey);
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
+    };
+
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+                <KeyRound className="h-4 w-4" /> {label}
+            </label>
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Input
+                        type={showKey ? "text" : "password"}
+                        autoComplete="off"
+                        placeholder={placeholder}
+                        value={localKey}
+                        onChange={(e) => setLocalKey(e.target.value)}
+                        aria-label={label}
+                    />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowKey(!showKey)}
+                        aria-label={showKey ? "Hide key" : "Show key"}
+                    >
+                        {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                </div>
+                <Button onClick={handleSave} disabled={localKey.trim() === value}>
+                    {isSaved ? "Saved!" : localKey.trim() || !value ? "Save" : "Remove"}
+                </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{help}</p>
         </div>
     );
 }
@@ -136,7 +192,7 @@ function AudioSettingsSection() {
                                 onChange={(e) => setAudioSettings({ provider: e.target.value as 'browser' | 'openai' })}
                             >
                                 <option value="browser">Browser API (Free, Offline)</option>
-                                <option value="openai">OpenAI TTS (High Quality, Paid)</option>
+                                <option value="openai">OpenAI TTS (High Quality, Paid — needs an OpenAI key)</option>
                             </select>
                         </div>
 

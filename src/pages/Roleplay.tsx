@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "@/store";
-import { type ChatMessage, generateResponse } from "@/lib/openai";
+import { type ChatMessage } from "@/lib/openai";
+import { complete, useAIReady } from "@/lib/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -92,7 +93,8 @@ const SCENARIOS = [
 const LEARNER_GUIDANCE = " The learner is a beginner (A1–A2). Use short, simple sentences and common words. If they write in English or get stuck, reply with a simple Russian phrase they could use, followed by its English meaning in parentheses. Briefly correct real grammar mistakes in English parentheses, then stay in character.";
 
 export default function RoleplayPage() {
-    const { apiKey, chatSessions, saveChatSession, clearChatSession } = useAppStore();
+    const { chatSessions, saveChatSession, clearChatSession } = useAppStore();
+    const aiReady = useAIReady();
     const [selectedScenario, setSelectedScenario] = useState<typeof SCENARIOS[0] | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
@@ -145,7 +147,7 @@ export default function RoleplayPage() {
     };
 
     const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading || !apiKey || !selectedScenario) return;
+        if (!inputValue.trim() || isLoading || !aiReady || !selectedScenario) return;
 
         const userMsg: ChatMessage = { role: "user", content: inputValue };
         const newMessages = [...messages, userMsg];
@@ -157,9 +159,9 @@ export default function RoleplayPage() {
         setError(null);
 
         try {
-            const response = await generateResponse(apiKey, newMessages);
-            if (response) {
-                const botMsg: ChatMessage = { role: "assistant", content: response.content || "" };
+            const reply = await complete(newMessages, { maxTokens: 8000 });
+            if (reply) {
+                const botMsg: ChatMessage = { role: "assistant", content: reply };
                 const updatedMessages = [...newMessages, botMsg];
                 setMessages(updatedMessages);
                 saveChatSession(selectedScenario.id, updatedMessages);
@@ -179,13 +181,13 @@ export default function RoleplayPage() {
         }
     };
 
-    if (!apiKey) {
+    if (!aiReady) {
         return (
             <div className="flex flex-col items-center justify-center h-[80vh] gap-4 p-4">
                 <Alert variant="destructive" className="max-w-md">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>API Key Missing</AlertTitle>
-                    <AlertDescription>Please set your OpenAI API Key in Settings to use Roleplay.</AlertDescription>
+                    <AlertDescription>Add an OpenAI or Claude API key in Settings to use Roleplay.</AlertDescription>
                 </Alert>
                 <Button asChild><Link to="/settings">Go to Settings</Link></Button>
             </div>

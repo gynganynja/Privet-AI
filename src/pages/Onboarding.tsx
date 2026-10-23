@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppStore } from "@/store";
+import { useAppStore, type AIProvider } from "@/store";
+import { providerKey } from "@/lib/ai";
 import { GoalHub } from "@/components/onboarding/GoalHub";
 import { PlacementTest, type Placement } from "@/components/onboarding/PlacementTest";
 import { Button } from "@/components/ui/button";
@@ -11,20 +12,26 @@ type Step = 'WELCOME' | 'GOAL' | 'EXPERIENCE' | 'TEST' | 'KEY';
 
 export default function OnboardingPage() {
     const navigate = useNavigate();
-    const { apiKey, setApiKey, completeOnboarding } = useAppStore();
+    const store = useAppStore();
+    const { setApiKey, setAnthropicKey, setAIProvider, completeOnboarding } = store;
     const [step, setStep] = useState<Step>('WELCOME');
     const [goal, setGoal] = useState<string>();
     const [placement, setPlacement] = useState<Placement>('beginner');
-    const [keyInput, setKeyInput] = useState(apiKey);
+    const [provider, setProvider] = useState<AIProvider>(store.aiProvider);
+    const [keyInput, setKeyInput] = useState("");
 
     const handlePlaced = (result: Placement) => {
         setPlacement(result);
-        if (apiKey) finish(result);
+        if (providerKey(store)) finish(result);
         else setStep('KEY');
     };
 
     const finish = (result: Placement = placement) => {
-        if (keyInput.trim()) setApiKey(keyInput);
+        if (keyInput.trim()) {
+            setAIProvider(provider);
+            if (provider === 'anthropic') setAnthropicKey(keyInput);
+            else setApiKey(keyInput);
+        }
         completeOnboarding(result, goal);
         navigate("/", { replace: true });
     };
@@ -92,15 +99,29 @@ export default function OnboardingPage() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-8">
                         <div className="text-center space-y-2">
                             <KeyRound className="h-10 w-10 text-primary mx-auto" />
-                            <h2 className="text-2xl font-bold">Connect OpenAI</h2>
+                            <h2 className="text-2xl font-bold">Connect your AI tutor</h2>
                             <p className="text-muted-foreground">
-                                Privet AI writes your lessons with OpenAI, using your own API key. It's stored only in this browser
-                                and sent only to OpenAI.
+                                Privet AI writes your lessons with Claude or OpenAI, using your own API key. It's stored only in
+                                this browser and sent only to that provider.
                             </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="AI provider">
+                            {([['anthropic', 'Claude'], ['openai', 'OpenAI']] as const).map(([id, name]) => (
+                                <Button
+                                    key={id}
+                                    role="radio"
+                                    aria-checked={provider === id}
+                                    variant={provider === id ? "default" : "outline"}
+                                    onClick={() => { setProvider(id); setKeyInput(""); }}
+                                >
+                                    {name}
+                                </Button>
+                            ))}
                         </div>
                         <Input
                             type="password"
-                            placeholder="sk-..."
+                            aria-label={provider === 'anthropic' ? "Claude API key" : "OpenAI API key"}
+                            placeholder={provider === 'anthropic' ? "sk-ant-..." : "sk-..."}
                             value={keyInput}
                             onChange={(e) => setKeyInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && keyInput.trim() && finish()}
@@ -108,9 +129,15 @@ export default function OnboardingPage() {
                         />
                         <p className="text-xs text-muted-foreground">
                             Create one at{" "}
-                            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline text-primary">
-                                platform.openai.com/api-keys
-                            </a>.
+                            {provider === 'anthropic' ? (
+                                <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noreferrer" className="underline text-primary">
+                                    platform.claude.com
+                                </a>
+                            ) : (
+                                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="underline text-primary">
+                                    platform.openai.com/api-keys
+                                </a>
+                            )}.
                         </p>
                         <div className="grid gap-3">
                             <Button size="lg" className="h-12" disabled={!keyInput.trim()} onClick={() => finish()}>
